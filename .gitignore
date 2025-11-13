@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+backend/node_modules/
+*.swp
+*.swo
+
+q4-37_conductor.sh

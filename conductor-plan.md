@@ -113,6 +113,53 @@
 - `reporter/log_stream.py`（日志回传）
 - `config/config.yaml`
 
+## 2.4 模块任务拆解与依赖
+
+### 2.4.1 原则
+- 模块需具备独立的接口契约与可观察输出（日志、API、UI），方便单独编译/运行/测试。
+- 先实现被依赖的底座模块（配置、数据层、协议层），再实现上层交互模块，避免反复返工。
+- 为每个模块定义直接依赖与测试入口（unit/integration/widget/E2E stub），确保可在 CI 中独立执行。
+
+### 2.4.2 Backend 控制平面任务
+| 模块 | 主要任务 | 可独立测试 | 直接依赖 | 优先级 |
+| --- | --- | --- | --- | --- |
+| `db/redis foundation` | 定义 PostgreSQL schema、Redis key 约定、基础 repository（project/task/message）。 | SQL migration 测试 + repository 单测（NestJS testing module）。 | 无 | P0 |
+| `auth` | JWT 签发/校验、Agent Token、用户 CRUD API。 | controller/service 单测 + token 集成测试（mock db）。 | 数据层 | P0 |
+| `project-task` | Project/Task API、状态机、任务过滤。 | service 单测 + API contract 测试（supertest）。 | 数据层、auth | P1 |
+| `message` | 消息持久化、分页、富文本（Markdown）校验。 | repository 单测 + API contract。 | 数据层、project-task | P1 |
+| `realtime` | WS Hub、会话路由、消息 fan-out、心跳。 | WebSocket 集成测试（supertest + ws client mock）。 | auth、message | P2 |
+| `agent` | Agent 注册、心跳、能力描述、任务分配。 | service 单测 + WS stub 测试。 | realtime、project-task | P2 |
+| `notify` | 推送/邮件、失败重试、订阅偏好。 | 集成测试（使用本地 FCM/APNS mock）。 | message、agent | P3 |
+
+### 2.4.3 SDK 执行层任务
+| 模块 | 主要任务 | 可独立测试 | 直接依赖 | 优先级 |
+| --- | --- | --- | --- | --- |
+| `config` | 解析 config.yaml / env、校验必填项。 | pydantic 模型单测。 | 无 | P0 |
+| `ws_client` | 与 Backend 建立/保持 WebSocket、自动重连。 | async 单测（pytest + pytest-asyncio）。 | config | P0 |
+| `project_context` | Git 状态、文件快照、diff 生成。 | 本地仓库 fixture 单测。 | config | P1 |
+| `ai_client` | OpenAI/Anthropic 统一接口、rate limit。 | HTTP mock 单测（respx）。 | config | P1 |
+| `actions` | run_script/run_tests/build/patch 语言无关执行。 | subprocess mock 单测 + 沙箱集成测试。 | project_context、ws_client | P2 |
+| `reporter/log_stream` | 日志流式上报、状态同步。 | aiohttp mock 集成测试。 | ws_client | P2 |
+| `orchestrator` | 任务状态机、超时、错误恢复。 | end-to-end stub（mock ws + mock ai）。 | 上述所有 | P3 |
+
+### 2.4.4 App (Flutter) 任务
+| 模块 | 主要任务 | 可独立测试 | 直接依赖 | 优先级 |
+| --- | --- | --- | --- | --- |
+| `data/http_client` | dio 封装、鉴权拦截器、错误处理。 | unit test（mocktail）。 | 无 | P0 |
+| `data/ws_client` | web_socket_channel 封装、心跳重连。 | unit test + integration（fake backend）。 | http_client | P0 |
+| `state/project_task_provider` | riverpod store、状态缓存、离线策略。 | riverpod unit test。 | data 层 | P1 |
+| `ui/task_list` | 任务列表、筛选、刷新。 | widget test（golden）。 | state layer | P1 |
+| `ui/chat` | 消息流 + Markdown 渲染 + action bar。 | widget test + markdown 渲染单测。 | state layer、ws client | P2 |
+| `ui/log_view` | 日志流终端、复制、颜色映射。 | widget test（log 模拟）。 | ws client | P2 |
+| `agent_management` | Agent 列表、健康指示、push 订阅。 | widget test + integration（fake push）。 | state layer、push svc | P3 |
+
+### 2.4.5 跨层依赖顺序
+1. Backend `db foundation` + `auth` 决定 API/WS 协议 → SDK/App 根据 schema 生成客户端。
+2. Backend `realtime` 完成后，SDK `ws_client` 与 App `ws_client` 才能进入联调。
+3. SDK `actions` 依赖 `project_context` 与 `ai_client`；完成后可与 Backend `agent` 模块做任务分配集成测试。
+4. App UI 模块均依赖 `state layer`，因此需优先实现数据与状态管理，再逐步解锁 Task List → Chat → Log → Agent 管理。
+5. 集成测试顺序：Backend+SDK（任务执行链路） → Backend+App（任务可视化） → 全链路（E2E）。
+
 ---
 
 # 3. 数据模型（技术版）
@@ -879,4 +926,3 @@ sequenceDiagram
 - 更详细的开发路线图与测试计划
 
 可直接作为项目的技术蓝图，指导后续落地开发与团队协作。
-
