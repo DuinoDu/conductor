@@ -32,9 +32,3 @@
 ## Security & Configuration Tips
 - Copy `backend/.env.example` to `.env`; set `DB_DIALECT=sqlite` for file-backed dev or rely on `make infra-up` for Postgres/Redis.
 - Never commit secrets; manage CORS by editing `CORS_ORIGINS` before `make start-backend`, and restrict access to `conductor.db` when using SQLite.
-
-## Develop
-
-- test: make test
-- deploy backend: make start-backend
-- deploy app in web: make start-app

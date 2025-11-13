@@ -11,6 +11,7 @@ import { TaskStatus } from '../entities';
 export interface CreateTaskDto {
   projectId: string;
   title: string;
+  taskId?: string;
 }
 
 const transitions: Record<TaskStatus, TaskStatus[]> = {
@@ -33,6 +34,7 @@ export class TaskService {
       throw new NotFoundException(`Project ${dto.projectId} not found`);
     }
     return this.taskRepository.createTask({
+      id: dto.taskId,
       project,
       title: dto.title,
     });

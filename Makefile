@@ -47,7 +47,7 @@ start-backend: backend-build
 
 start-app:
 	cd $(APP_DIR) && \
-	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://0.0.0.0:4000
+	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.232.210:4000
 
 run: start-backend
 

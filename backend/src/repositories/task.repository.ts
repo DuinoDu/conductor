@@ -3,6 +3,7 @@ import { FindOptionsWhere, Repository } from 'typeorm';
 import { ProjectEntity, TaskEntity, TaskStatus } from '../entities';
 
 export interface CreateTaskInput {
+  id?: string;
   project: ProjectEntity;
   title: string;
   status?: TaskStatus;
@@ -17,6 +18,7 @@ export class TaskRepository {
 
   async createTask(input: CreateTaskInput): Promise<TaskEntity> {
     const task = this.repo.create({
+      id: input.id,
       project: input.project,
       title: input.title,
       status: input.status ?? TaskStatus.CREATED,
