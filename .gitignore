@@ -1,8 +1,15 @@
 .venv/
 __pycache__/
 *.pyc
-backend/node_modules/
 *.swp
 *.swo
 
 q4-37_conductor.sh
+
+backend/node_modules/
+backend/coverage
+backend/.env
+backend/dist/
+*.db
+*.spec.js
+*.spec.js.map

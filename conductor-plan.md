@@ -8,29 +8,34 @@
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                       Conductor App                      │
-│   - Flutter UI                                           │
-│   - Chat / Task / Log UI                                 │
-│   - HTTPS / WebSocket client                             │
+│                  External AI Processes                   │
+│  (Codex / CC / 自定义 Agent)                             │
+│  - 运行在独立进程                                         │
+│  - 通过 MCP Client 连接 SDK                               │
+└───────────────↓───────────────────────────────┬──────────┘
+                          MCP
+┌───────────────────────────────────────────────┴──────────┐
+│                             SDK                           │
+│   - MCP Server（create_task / send_message / receive）     │
+│   - 会话管理 / 消息路由                                   │
+│   - WebSocket Client                                      │
 └───────────────↑───────────────────────────────┬──────────┘
-                                HTTPS / WS
+                          WS (long-lived)
 ┌───────────────────────────────────────────────┴──────────┐
 │                         Backend                           │
 │  - User/Auth                                               │
 │  - Project/Task/Message Store                              │
-│  - WS Hub  (App <-> SDK 路由)                              │
+│  - WS Hub  (App ↔ SDK 路由)                                │
 │  - Push Notification                                       │
 │  - Agent Registry / Heartbeat                              │
 └───────────────↑───────────────────────────────┬──────────┘
-                          WS (long-lived)
-┌───────────────────────────────────────────────┴──────────┐
-│                             SDK                           │
-│   - WebSocket Client                                       │
-│   - AI Model Interface (OpenAI/Anthropic/local)            │
-│   - Local Script Runner                                     │
-│   - Patch Generator / File Analyzer                         │
-│   - Project Context Manager                                 │
-└────────────────────────────────────────────────────────────┘
+                                HTTPS / WS
+┌──────────────────────────────────────────────────────────┐
+│                       Conductor App                      │
+│   - Flutter UI                                           │
+│   - Chat / Task / Log UI                                 │
+│   - HTTPS / WebSocket client                             │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -87,31 +92,37 @@
 ## 2.3 SDK 模块（执行层）
 
 ### 职责：
-- 与后端保持 WebSocket 长连接
-- 处理任务执行指令
-- 调用 AI 模型
-- 执行 shell/local scripts
-- 生成 patch
-- 分析文件/代码
-- 上报状态、日志、AI 回复
+- 与 Backend 建立持久 WS 连接，感知 App 端的任务/消息事件。
+- 通过 MCP Server 暴露基础工具（创建任务会话、发送消息、接收 App 端回复），供外部 AI 进程调用。
+- 维护任务会话状态与消息缓冲，确保多 Agent/多模型协同时的一致性。
+- 将外部 AI 的回复、状态同步到 Backend → App，形成远程协作闭环。
 
 ### 技术选型：
 - Python 3.10+
 - websockets 或 aiohttp
-- httpx
-- openai / anthropic SDK
-- gitpython
-- subprocess / asyncio
+- httpx（调用 Backend REST 辅助接口）
+- MCP 协议实现（如 open-mcp / 自研实现）
+- asyncio
 - pydantic（配置 & 数据结构）
 
 ### SDK 模块结构：
 - `client/ws_client.py`（WS 长连接）
-- `model/ai_client.py`（AI 调用）
-- `actions/*.py`（执行动作）
-- `executor/script_runner.py`（shell 执行）
-- `context/project_context.py`（文件树、git diff）
-- `reporter/log_stream.py`（日志回传）
+- `mcp/server.py`（MCP Server，对外暴露工具）
+- `session/session_manager.py`（任务会话状态、消息缓存）
+- `message/message_router.py`（消息路由、去重、重放）
+- `context/project_context.py`（路径映射、repo 元数据，用于工具提供上下文）
+- `reporter/event_stream.py`（状态/事件上报）
 - `config/config.yaml`
+
+首批 MCP 工具（v1）：
+
+| Tool 名称 | 作用 | 入参 | 返回值 |
+| --- | --- | --- | --- |
+| `create_task_session` | 在 Backend 创建 Task，并驱动 App 生成新的聊天对话框。 | `project_id`、`title`、可选初始用户消息 `prefill` | `{ "task_id": "...", "session_id": "...", "app_url": "..." }` |
+| `send_message` | 将外部 AI 的回复注入 Backend → App，支持 Markdown/代码块。 | `task_id`、`content`、`metadata`(可选，如模型名、延迟) | `{ "message_id": "...", "delivered": true }` |
+| `receive_messages` | 拉取 App 端用户/系统消息，支持 offset / ack，默认只返回未读。 | `task_id`、`ack_token`(可选)、`limit` | `{ "messages": [...], "next_ack_token": "...", "has_more": true/false }` |
+| `ack_messages` | 显式确认已处理的消息，避免重复推送。 | `task_id`、`ack_token` | `{ "status": "ok" }` |
+| `list_sessions`（可选） | 列出当前 SDK 维护的会话上下文（task_id、最近消息时间）。 | `project_id`(可选) | `[{ "task_id": "...", "title": "...", "last_message_at": "..." }]` |
 
 ## 2.4 模块任务拆解与依赖
 
@@ -136,11 +147,12 @@
 | --- | --- | --- | --- | --- |
 | `config` | 解析 config.yaml / env、校验必填项。 | pydantic 模型单测。 | 无 | P0 |
 | `ws_client` | 与 Backend 建立/保持 WebSocket、自动重连。 | async 单测（pytest + pytest-asyncio）。 | config | P0 |
-| `project_context` | Git 状态、文件快照、diff 生成。 | 本地仓库 fixture 单测。 | config | P1 |
-| `ai_client` | OpenAI/Anthropic 统一接口、rate limit。 | HTTP mock 单测（respx）。 | config | P1 |
-| `actions` | run_script/run_tests/build/patch 语言无关执行。 | subprocess mock 单测 + 沙箱集成测试。 | project_context、ws_client | P2 |
-| `reporter/log_stream` | 日志流式上报、状态同步。 | aiohttp mock 集成测试。 | ws_client | P2 |
-| `orchestrator` | 任务状态机、超时、错误恢复。 | end-to-end stub（mock ws + mock ai）。 | 上述所有 | P3 |
+| `session_manager` | 任务会话生命周期、消息缓冲、重放。 | state 单测（pytest）。 | config、ws_client | P1 |
+| `message_router` | App ↔ SDK 消息路由、去重、过滤。 | integration test（mock ws client）。 | ws_client、session_manager | P1 |
+| `project_context` | 提供项目/仓库元信息给 MCP 工具。 | 本地仓库 fixture 单测。 | config | P1 |
+| `mcp_server` | MCP Server，暴露 `create_task` / `send_message` / `receive_message` 工具。 | integration test（pytest-asyncio + mock ws）。 | ws_client、session_manager、message_router、project_context | P2 |
+| `reporter/event_stream` | SDK → Backend 状态同步、工具调用审计。 | aiohttp mock 集成测试。 | ws_client | P2 |
+| `orchestrator` | 会话编排、错误恢复、协调外部 AI 进程。 | end-to-end stub（mock ws + mock mcp client）。 | 上述所有 | P3 |
 
 ### 2.4.4 App (Flutter) 任务
 | 模块 | 主要任务 | 可独立测试 | 直接依赖 | 优先级 |
@@ -156,7 +168,7 @@
 ### 2.4.5 跨层依赖顺序
 1. Backend `db foundation` + `auth` 决定 API/WS 协议 → SDK/App 根据 schema 生成客户端。
 2. Backend `realtime` 完成后，SDK `ws_client` 与 App `ws_client` 才能进入联调。
-3. SDK `actions` 依赖 `project_context` 与 `ai_client`；完成后可与 Backend `agent` 模块做任务分配集成测试。
+3. SDK `mcp_server` 依赖 `ws_client`、`session_manager`、`project_context`，完成后外部 AI 才能通过 MCP 工具驱动 Backend → App 的任务对话。
 4. App UI 模块均依赖 `state layer`，因此需优先实现数据与状态管理，再逐步解锁 Task List → Chat → Log → Agent 管理。
 5. 集成测试顺序：Backend+SDK（任务执行链路） → Backend+App（任务可视化） → 全链路（E2E）。
 
@@ -193,6 +205,30 @@
   "token": "string",
   "status": "ONLINE|OFFLINE",
   "projects": ["path1", "path2"]
+}
+```
+
+## TaskSession
+```json
+{
+  "task_id": "uuid",
+  "session_id": "string",
+  "project_id": "uuid",
+  "status": "ACTIVE|ENDED",
+  "created_at": "timestamp",
+  "last_message_at": "timestamp"
+}
+```
+
+## MCPMessage
+```json
+{
+  "message_id": "uuid",
+  "task_id": "uuid",
+  "role": "user|app|sdk|system",
+  "content": "markdown string",
+  "ack_token": "string",
+  "created_at": "timestamp"
 }
 ```
 
@@ -546,6 +582,93 @@ projects:
 }
 ```
 
+## 13.6 MCP 工具契约
+
+### 13.6.1 create_task_session
+
+**Request**
+```json
+{
+  "task_title": "Fix crash",
+  "project_id": "uuid",
+  "prefill": "用户上下文，可选"
+}
+```
+
+**Response**
+```json
+{
+  "task_id": "uuid",
+  "session_id": "string",
+  "app_url": "https://app.conductor/tasks/uuid"
+}
+```
+
+### 13.6.2 send_message
+
+**Request**
+```json
+{
+  "task_id": "uuid",
+  "content": "Markdown text with code blocks",
+  "metadata": {
+    "model": "codex",
+    "latency_ms": 1200
+  }
+}
+```
+
+**Response**
+```json
+{
+  "message_id": "uuid",
+  "delivered": true
+}
+```
+
+### 13.6.3 receive_messages
+
+**Request**
+```json
+{
+  "task_id": "uuid",
+  "ack_token": "opaque-string",
+  "limit": 20
+}
+```
+
+**Response**
+```json
+{
+  "messages": [
+    {
+      "message_id": "uuid",
+      "role": "user",
+      "content": "请更新文档",
+      "ack_token": "opaque-string",
+      "created_at": "2025-01-01T00:00:06Z"
+    }
+  ],
+  "next_ack_token": "opaque-string",
+  "has_more": false
+}
+```
+
+### 13.6.4 ack_messages
+
+**Request**
+```json
+{
+  "task_id": "uuid",
+  "ack_token": "opaque-string"
+}
+```
+
+**Response**
+```json
+{ "status": "ok" }
+```
+
 ---
 
 # 14. Backend OpenAPI 3.0 接口文档（概要）
@@ -726,22 +849,17 @@ conductor_sdk/
     ws/
       client.py           # 与 Backend 的 WS
       handlers.py         # 消息处理
-    actions/
-      __init__.py
-      run_tests.py
-      run_script.py
-      build.py
-      generate_patch.py
-      analyze_code.py
-    ai/
-      client.py           # OpenAI/Anthropic 封装
-      prompts.py
+    mcp/
+      server.py           # MCP Server，注册 create_task/send_message 等工具
+      tools.py            # 对外暴露的工具定义
+    session/
+      session_manager.py  # 任务会话与消息缓存
+    message/
+      router.py           # 消息路由/去重
     context/
-      project_context.py  # git, 文件树
-    executor/
-      script_runner.py
+      project_context.py  # repo 元信息、路径映射
     reporter/
-      log_stream.py
+      event_stream.py
 ```
 
 ---
@@ -756,40 +874,42 @@ sequenceDiagram
     participant A as App
     participant B as Backend
     participant S as SDK
-    participant M as AI Model
+    participant X as External AI (MCP Client)
 
     U->>A: 输入问题
     A->>B: POST /tasks/{id}/messages
     B->>S: WS task_user_message
-    S->>M: 调用 AI API
-    M-->>S: AI 回复
-    S->>B: WS ai_message
-    B->>A: WS push message
+    S->>X: MCP receive_messages
+    X-->>S: MCP send_message
+    S->>B: WS sdk_message
+    B->>A: WS push
     A->>U: 展示 AI 回复
 ```
 
-## 16.2 动作执行序列图（run_tests）
+## 16.2 MCP 会话序列图（create_task + send/receive）
 
 ```mermaid
 sequenceDiagram
-    participant U as User (App)
-    participant A as App
+    participant X as External AI (MCP Client)
+    participant S as SDK (MCP Server)
     participant B as Backend
-    participant S as SDK
-    participant SH as Shell
+    participant A as App
+    participant U as User
 
-    U->>A: 点击 Run Tests
-    A->>B: POST /tasks/{id}/actions (run_tests)
-    B->>S: WS task_action
-    S->>SH: 执行 pytest
-    SH-->>S: stdout/stderr 流
-    loop 日志流
-        S->>B: WS log_chunk
-        B->>A: WS log_chunk
-        A->>U: 渲染日志
-    end
-    S->>B: WS task_status_update (DONE/FAILED)
-    B->>A: WS 状态更新 + 推送
+    X->>S: MCP create_task_session(project, title)
+    S->>B: POST /tasks
+    B-->>S: task_id
+    S-->>X: 返回 task_id
+    B->>A: 推送新对话
+    X->>S: MCP send_message(task_id, content)
+    S->>B: WS sdk_message
+    B->>A: WS push
+    A->>U: 展示 AI 消息
+    U->>A: 输入反馈
+    A->>B: POST /tasks/{id}/messages
+    B->>S: WS task_user_message
+    S->>X: MCP receive_messages(task_id)
+    X-->>S: ack message_id
 ```
 
 ---
@@ -880,7 +1000,7 @@ sequenceDiagram
 
 ### 19.2.1 单元测试
 - Backend：service / controller / repository
-- SDK：actions / ai_client / script_runner
+- SDK：actions / mcp_server / script_runner
 - App：状态管理逻辑
 
 ### 19.2.2 集成测试
