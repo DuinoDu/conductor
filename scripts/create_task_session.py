@@ -24,7 +24,8 @@ from conductor.reporter import EventReporter
 from conductor.session import SessionManager
 from conductor.ws import ConductorWebSocketClient
 
-DEFAULT_PREFILL = "Task created from test_conduct.py"
+DEFAULT_PREFILL = "Hahahahahaha"
+DEFAULT_LISTEN_SECONDS = 15.0
 
 
 @dataclass
@@ -97,7 +98,7 @@ async def main() -> None:
         prefill = os.environ.get("TASK_PREFILL", DEFAULT_PREFILL)
 
         print("DEBUG: mcp_server.handle_request")
-        result = await mcp_server.handle_request(
+        task_result = await mcp_server.handle_request(
             "create_task_session",
             {
                 "project_id": project.id,
@@ -106,11 +107,48 @@ async def main() -> None:
             },
         )
         print("create_task_session result:")
-        print(json.dumps(result, indent=2))
-        # Brief pause so the backend processes the task before we exit.
-        await asyncio.sleep(0.5)
+        print(json.dumps(task_result, indent=2))
+
+        listen_seconds = float(os.environ.get("TASK_LISTEN_SECONDS", DEFAULT_LISTEN_SECONDS))
+        await _listen_for_messages(
+            mcp_server,
+            task_result["task_id"],
+            duration=listen_seconds,
+        )
     finally:
         await orchestrator.stop()
+
+
+async def _listen_for_messages(mcp_server: MCPServer, task_id: str, *, duration: float) -> None:
+    """Continuously fetch and ack new messages for a limited amount of time."""
+
+    print(f"Listening for replies for up to {duration:.1f}s...")
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(duration, 0.0)
+    while loop.time() < deadline:
+        response = await mcp_server.handle_request(
+            "receive_messages",
+            {"task_id": task_id},
+        )
+        messages = response.get("messages", [])
+        if messages:
+            for message in messages:
+                role = message.get("role", "unknown")
+                content = message.get("content", "")
+                message_id = message.get("message_id", "unknown")
+                print(f"[{role}] {message_id}: {content}")
+
+            ack_token = response.get("next_ack_token")
+            if ack_token:
+                await mcp_server.handle_request(
+                    "ack_messages",
+                    {
+                        "task_id": task_id,
+                        "ack_token": ack_token,
+                    },
+                )
+
+        await asyncio.sleep(0.5)
 
 
 if __name__ == "__main__":

@@ -106,3 +106,43 @@ async def test_ws_client_reconnects_and_sends_after_close():
     assert len(connections) >= 2
     assert json.loads(connections[-1].sent[-1]) == {"type": "ping"}
     await client.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_ws_client_uses_modern_header_keyword():
+    captured_headers: list[dict[str, str] | None] = []
+
+    async def connect_mock(_url, *, additional_headers=None):
+        captured_headers.append(additional_headers)
+        return FakeWebSocket()
+
+    client = ConductorWebSocketClient(
+        make_config(),
+        reconnect_delay=0.05,
+        heartbeat_interval=0.05,
+        connect_impl=connect_mock,
+    )
+
+    await client.connect()
+    await client.disconnect()
+    assert captured_headers == [{"Authorization": "Bearer token"}]
+
+
+@pytest.mark.asyncio
+async def test_ws_client_falls_back_to_legacy_header_keyword():
+    captured_headers: list[dict[str, str] | None] = []
+
+    async def connect_mock(_url, *, extra_headers=None):
+        captured_headers.append(extra_headers)
+        return FakeWebSocket()
+
+    client = ConductorWebSocketClient(
+        make_config(),
+        reconnect_delay=0.05,
+        heartbeat_interval=0.05,
+        connect_impl=connect_mock,
+    )
+
+    await client.connect()
+    await client.disconnect()
+    assert captured_headers == [{"Authorization": "Bearer token"}]
