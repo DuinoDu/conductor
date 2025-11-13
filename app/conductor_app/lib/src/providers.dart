@@ -3,16 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/app_config.dart';
 import 'data/auth_storage.dart';
 import 'data/http_client.dart';
+import 'features/chat/chat_repository.dart';
 import 'features/tasks/task_repository.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
-  // Default base URL can be overridden in tests or via top-level ProviderScope overrides.
-  return const AppConfig(baseUrl: 'http://localhost:3000');
+  return AppConfig.fromEnv();
 });
 
 final authStorageProvider = Provider<AuthStorage>((ref) {
-  // In production this should be replaced with secure storage implementation.
-  return InMemoryAuthStorage();
+  return EnvAuthStorage();
 });
 
 final apiClientProvider = Provider<ApiClient>((ref) {
@@ -24,4 +23,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return HttpTaskRepository(ref.watch(apiClientProvider));
+});
+
+final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+  return ChatRepository(ref.watch(apiClientProvider));
 });

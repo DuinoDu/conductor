@@ -33,7 +33,8 @@ class FakeSink implements WebSocketSink {
   Future get done => _done.future;
 }
 
-class FakeChannel extends StreamChannelMixin<dynamic> implements WebSocketChannel {
+class FakeChannel extends StreamChannelMixin<dynamic>
+    implements WebSocketChannel {
   FakeChannel(this.controller) : sinkImpl = FakeSink();
 
   final StreamController<dynamic> controller;

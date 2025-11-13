@@ -1,3 +1,9 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { MessageRepository } from '../repositories/message.repository';
 import { TaskRepository } from '../repositories/task.repository';
 import { MessageEntity, MessageRole } from '../entities';
@@ -15,6 +21,7 @@ export interface ListMessagesOptions {
   offset?: number;
 }
 
+@Injectable()
 export class MessageService {
   constructor(
     private readonly messageRepository: MessageRepository,
@@ -22,10 +29,14 @@ export class MessageService {
   ) {}
 
   async createMessage(dto: CreateMessageDto): Promise<MessageEntity> {
-    validateMarkdown(dto.content);
+    try {
+      validateMarkdown(dto.content);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
     const task = await this.taskRepository.findById(dto.taskId);
     if (!task) {
-      throw new Error(`Task ${dto.taskId} not found`);
+      throw new NotFoundException(`Task ${dto.taskId} not found`);
     }
     return this.messageRepository.createMessage({
       task,

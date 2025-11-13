@@ -30,6 +30,8 @@ const sqliteOptions: DataSourceOptions = {
 
 export const isTestEnv = () => process.env.NODE_ENV === 'test';
 
+let activeDataSource: DataSource | null = null;
+
 export const createAppDataSource = (
   overrides?: Partial<DataSourceOptions>,
 ): DataSource => {
@@ -42,3 +44,14 @@ export const createAppDataSource = (
 };
 
 export const AppDataSource = createAppDataSource();
+
+export const setActiveDataSource = (dataSource: DataSource): void => {
+  activeDataSource = dataSource;
+};
+
+export const getActiveDataSource = (): DataSource => {
+  if (!activeDataSource || !activeDataSource.isInitialized) {
+    throw new Error('Data source has not been initialized');
+  }
+  return activeDataSource;
+};

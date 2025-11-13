@@ -14,3 +14,10 @@ class InMemoryAuthStorage implements AuthStorage {
   @override
   Future<String?> readToken() async => _token;
 }
+
+class EnvAuthStorage implements AuthStorage {
+  static const _envToken = String.fromEnvironment('AUTH_TOKEN', defaultValue: '');
+
+  @override
+  Future<String?> readToken() async => _envToken.isEmpty ? null : _envToken;
+}

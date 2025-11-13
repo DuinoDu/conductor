@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'task_detail_page.dart';
 import 'task_list_controller.dart';
 
 class TaskListPage extends ConsumerWidget {
@@ -28,6 +29,15 @@ class TaskListPage extends ConsumerWidget {
                 return ListTile(
                   title: Text(task.title),
                   subtitle: Text('Status: ${task.status}'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            TaskDetailPage(taskId: task.id, title: task.title),
+                      ),
+                    );
+                  },
                 );
               },
             ),

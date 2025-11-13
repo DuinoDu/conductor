@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 
 import { ProjectEntity, TaskEntity, TaskStatus } from '../entities';
 
@@ -31,12 +31,17 @@ export class TaskRepository {
     });
   }
 
-  async listByProject(projectId: string, status?: TaskStatus): Promise<TaskEntity[]> {
+  async listByProject(projectId?: string, status?: TaskStatus): Promise<TaskEntity[]> {
+    const filters: FindOptionsWhere<TaskEntity> = {};
+    if (projectId) {
+      filters.project = { id: projectId } as ProjectEntity;
+    }
+    if (status) {
+      filters.status = status;
+    }
+    const hasFilters = Boolean(projectId || status);
     return this.repo.find({
-      where: {
-        project: { id: projectId },
-        ...(status ? { status } : {}),
-      },
+      where: hasFilters ? filters : undefined,
       relations: { project: true },
       order: { createdAt: 'DESC' },
     });

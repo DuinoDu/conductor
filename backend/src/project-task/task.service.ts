@@ -1,3 +1,9 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { ProjectRepository } from '../repositories/project.repository';
 import { TaskRepository } from '../repositories/task.repository';
 import { TaskStatus } from '../entities';
@@ -14,6 +20,7 @@ const transitions: Record<TaskStatus, TaskStatus[]> = {
   [TaskStatus.FAILED]: [],
 };
 
+@Injectable()
 export class TaskService {
   constructor(
     private readonly projectRepository: ProjectRepository,
@@ -23,7 +30,7 @@ export class TaskService {
   async createTask(dto: CreateTaskDto) {
     const project = await this.projectRepository.findById(dto.projectId);
     if (!project) {
-      throw new Error(`Project ${dto.projectId} not found`);
+      throw new NotFoundException(`Project ${dto.projectId} not found`);
     }
     return this.taskRepository.createTask({
       project,
@@ -31,21 +38,31 @@ export class TaskService {
     });
   }
 
-  listTasks(projectId: string, status?: TaskStatus) {
+  listTasks(projectId?: string, status?: TaskStatus) {
     return this.taskRepository.listByProject(projectId, status);
+  }
+
+  async getTask(taskId: string) {
+    const task = await this.taskRepository.findById(taskId);
+    if (!task) {
+      throw new NotFoundException(`Task ${taskId} not found`);
+    }
+    return task;
   }
 
   async updateStatus(taskId: string, status: TaskStatus) {
     const task = await this.taskRepository.findById(taskId);
     if (!task) {
-      throw new Error(`Task ${taskId} not found`);
+      throw new NotFoundException(`Task ${taskId} not found`);
     }
     if (task.status === status) {
       return task;
     }
     const allowed = transitions[task.status] ?? [];
     if (!allowed.includes(status)) {
-      throw new Error(`Invalid transition from ${task.status} to ${status}`);
+      throw new BadRequestException(
+        `Invalid transition from ${task.status} to ${status}`,
+      );
     }
     return this.taskRepository.updateStatus(taskId, status);
   }

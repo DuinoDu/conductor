@@ -1,3 +1,5 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+
 import { ProjectRepository } from '../repositories/project.repository';
 
 export interface CreateProjectDto {
@@ -6,6 +8,7 @@ export interface CreateProjectDto {
   metadata?: Record<string, unknown>;
 }
 
+@Injectable()
 export class ProjectService {
   constructor(private readonly projectRepository: ProjectRepository) {}
 
@@ -17,7 +20,11 @@ export class ProjectService {
     return this.projectRepository.listProjects();
   }
 
-  getProject(id: string) {
-    return this.projectRepository.findById(id);
+  async getProject(id: string) {
+    const project = await this.projectRepository.findById(id);
+    if (!project) {
+      throw new NotFoundException(`Project ${id} not found`);
+    }
+    return project;
   }
 }
