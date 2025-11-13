@@ -5,6 +5,7 @@ PIP := $(VENV)/bin/pip
 PYTEST := $(VENV)/bin/pytest
 BACKEND_DIR := backend
 BACKEND_NODE_MODULES := $(BACKEND_DIR)/node_modules
+APP_DIR := app/conductor_app
 
 .PHONY: deps deps-sdk deps-backend
 deps: deps-sdk deps-backend
@@ -34,17 +35,21 @@ test-backend: deps-backend
 	npm --prefix $(BACKEND_DIR) test
 
 test-app:
-	cd app/conductor_app; flutter test
+	cd $(APP_DIR); flutter test
 
-test: backend-test sdk-test
+test: backend-test sdk-test test-app
 
 backend-build: deps-backend
 	npm --prefix $(BACKEND_DIR) run build
 
-backend-start: backend-build
-	cd $(BACKEND_DIR) && PORT=4000 npm start
+start-backend: backend-build
+	cd $(BACKEND_DIR) && PORT=4000 HOST=0.0.0.0 npm start
 
-run: backend-start
+start-app:
+	cd $(APP_DIR) && \
+	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://0.0.0.0:4000
+
+run: start-backend
 
 infra-up:
 	docker compose -f docker-compose.local.yml up -d
@@ -52,7 +57,7 @@ infra-up:
 infra-down:
 	docker compose -f docker-compose.local.yml down
 
-KILL_PORTS := 4000 
+KILL_PORTS := 4000 6150
 
 kill:
 	@set -e; \

@@ -5,6 +5,9 @@
 - npm
 - Docker (for Postgres/Redis)
 
+## Configuration
+Copy `.env.example` to `.env` and adjust values as needed. `CORS_ORIGINS` accepts a comma‑separated list of allowed web origins (e.g., `http://localhost:61331` for Flutter web dev server).
+
 ## Quick start
 ```bash
 cp backend/.env.example backend/.env
