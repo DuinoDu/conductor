@@ -12,10 +12,10 @@ deps: deps-sdk deps-backend
 
 deps-sdk: $(STAMP)
 
-$(STAMP): requirements-dev.txt
+$(STAMP): sdk/requirements-dev.txt
 	$(PYTHON) -m venv $(VENV)
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements-dev.txt
+	$(PIP) install -r sdk/requirements-dev.txt
 	touch $(STAMP)
 
 deps-backend: $(BACKEND_NODE_MODULES)
