@@ -65,8 +65,8 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(chatProvider('t1').future);
-    expect(
-      () => container.read(chatProvider('t1').notifier).sendMessage('oops'),
+    await expectLater(
+      container.read(chatProvider('t1').notifier).sendMessage('oops'),
       throwsException,
     );
     final state = container.read(chatProvider('t1'));

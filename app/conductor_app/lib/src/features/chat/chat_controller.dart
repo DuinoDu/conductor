@@ -33,6 +33,8 @@ class ChatController
     if (trimmed.isEmpty) {
       return;
     }
+    final previousMessages =
+        List<Message>.from(state.value ?? const <Message>[]);
     final optimisticMessage = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       taskId: _taskId,
@@ -44,10 +46,7 @@ class ChatController
     try {
       await _repository.sendMessage(_taskId, content: trimmed);
     } catch (error) {
-      final current = state.value ?? [];
-      state = AsyncData(
-        current.where((message) => message.id != optimisticMessage.id).toList(),
-      );
+      state = AsyncData(previousMessages);
       rethrow;
     }
   }
