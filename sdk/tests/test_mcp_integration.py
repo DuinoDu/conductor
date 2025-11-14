@@ -2,6 +2,7 @@ import os
 import httpx
 import pytest
 
+from conductor.backend import BackendApiClient
 from conductor.config import ConductorConfig
 from conductor.mcp import MCPServer
 from conductor.message import MessageRouter
@@ -48,7 +49,14 @@ async def test_create_task_session_hits_backend_api():
 
     sessions = SessionManager()
     router = MessageRouter(sessions)
-    server = MCPServer(make_config(), session_manager=sessions, message_router=router, backend_sender=backend_sender)
+    backend_api = BackendApiClient(make_config())
+    server = MCPServer(
+        make_config(),
+        session_manager=sessions,
+        message_router=router,
+        backend_sender=backend_sender,
+        backend_api=backend_api,
+    )
 
     await server.handle_request("create_task_session", {"project_id": "proj1", "task_title": "Hello"})
     events = await _fetch_events()
@@ -64,7 +72,14 @@ async def test_create_task_session_prefill_payload():
 
     sessions = SessionManager()
     router = MessageRouter(sessions)
-    server = MCPServer(make_config(), session_manager=sessions, message_router=router, backend_sender=backend_sender)
+    backend_api = BackendApiClient(make_config())
+    server = MCPServer(
+        make_config(),
+        session_manager=sessions,
+        message_router=router,
+        backend_sender=backend_sender,
+        backend_api=backend_api,
+    )
 
     await server.handle_request("create_task_session", {"project_id": "proj2", "task_title": "Hi", "prefill": "context"})
     events = await _fetch_events()
@@ -80,7 +95,14 @@ async def test_send_message_hits_backend_api():
 
     sessions = SessionManager()
     router = MessageRouter(sessions)
-    server = MCPServer(make_config(), session_manager=sessions, message_router=router, backend_sender=backend_sender)
+    backend_api = BackendApiClient(make_config())
+    server = MCPServer(
+        make_config(),
+        session_manager=sessions,
+        message_router=router,
+        backend_sender=backend_sender,
+        backend_api=backend_api,
+    )
 
     await server.handle_request("send_message", {"task_id": "task1", "content": "reply"})
     events = await _fetch_events()
@@ -96,7 +118,14 @@ async def test_send_message_with_metadata():
 
     sessions = SessionManager()
     router = MessageRouter(sessions)
-    server = MCPServer(make_config(), session_manager=sessions, message_router=router, backend_sender=backend_sender)
+    backend_api = BackendApiClient(make_config())
+    server = MCPServer(
+        make_config(),
+        session_manager=sessions,
+        message_router=router,
+        backend_sender=backend_sender,
+        backend_api=backend_api,
+    )
 
     await server.handle_request("send_message", {"task_id": "task1", "content": "reply", "metadata": {"model": "codex"}})
     events = await _fetch_events()

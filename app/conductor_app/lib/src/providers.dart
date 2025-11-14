@@ -4,6 +4,7 @@ import 'data/app_config.dart';
 import 'data/auth_storage.dart';
 import 'data/http_client.dart';
 import 'features/chat/chat_repository.dart';
+import 'features/projects/project_repository.dart';
 import 'features/tasks/task_repository.dart';
 
 final appConfigProvider = Provider<AppConfig>((ref) {
@@ -23,6 +24,10 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return HttpTaskRepository(ref.watch(apiClientProvider));
+});
+
+final projectRepositoryProvider = Provider<ProjectRepository>((ref) {
+  return HttpProjectRepository(ref.watch(apiClientProvider));
 });
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {

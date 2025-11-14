@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/project.dart';
+import '../../models/task.dart';
+import '../projects/create_project_dialog.dart';
+import '../projects/project_list_controller.dart';
+import 'create_task_dialog.dart';
 import 'task_detail_page.dart';
 import 'task_list_controller.dart';
 
@@ -10,8 +15,13 @@ class TaskListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(taskListProvider);
+    ref.watch(projectListProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateOptions(context, ref),
+        child: const Icon(Icons.add),
+      ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Failed: $error')),
@@ -43,6 +53,78 @@ class TaskListPage extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+enum _CreateAction { project, task }
+
+Future<void> _showCreateOptions(BuildContext context, WidgetRef ref) async {
+  final action = await showModalBottomSheet<_CreateAction>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.create_new_folder_outlined),
+            title: const Text('Create Project'),
+            onTap: () => Navigator.of(ctx).pop(_CreateAction.project),
+          ),
+          ListTile(
+            leading: const Icon(Icons.task_alt),
+            title: const Text('Create Task'),
+            onTap: () => Navigator.of(ctx).pop(_CreateAction.task),
+          ),
+        ],
+      ),
+    ),
+  );
+  switch (action) {
+    case _CreateAction.project:
+      await _handleCreateProject(context, ref);
+      break;
+    case _CreateAction.task:
+      await _handleCreateTask(context, ref);
+      break;
+    default:
+      break;
+  }
+}
+
+Future<void> _handleCreateProject(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final project = await showDialog<Project>(
+    context: context,
+    builder: (_) => const CreateProjectDialog(),
+  );
+  if (project != null) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Project "${project.name}" created')),
+    );
+    await ref.read(projectListProvider.notifier).reload();
+  }
+}
+
+Future<void> _handleCreateTask(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final task = await showDialog<Task>(
+    context: context,
+    builder: (_) => const CreateTaskDialog(),
+  );
+  if (task != null) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Task "${task.title}" created')),
+    );
+    await ref.read(taskListProvider.notifier).reload();
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TaskDetailPage(taskId: task.id, title: task.title),
       ),
     );
   }

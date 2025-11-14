@@ -7,14 +7,23 @@ class Task {
   });
 
   final String id;
-  final String projectId;
+  final String? projectId;
   final String title;
   final String status;
+
+  Task copyWith({String? status}) {
+    return Task(
+      id: id,
+      projectId: projectId,
+      title: title,
+      status: status ?? this.status,
+    );
+  }
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
       id: json['id'] as String,
-      projectId: json['project_id'] as String,
+      projectId: json['project_id'] as String?,
       title: json['title'] as String? ?? '',
       status: json['status'] as String? ?? 'UNKNOWN',
     );

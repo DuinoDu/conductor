@@ -2,6 +2,7 @@ import asyncio
 
 from fastmcp import FastMCP
 
+from conductor.backend import BackendApiClient
 from conductor.config import load_config
 from conductor.message import MessageRouter
 from conductor.mcp import MCPServer
@@ -15,6 +16,7 @@ async def main() -> None:
     config = load_config()
     sessions = SessionManager()
     router = MessageRouter(sessions)
+    backend_api = BackendApiClient(config)
     ws_client = ConductorWebSocketClient(config)
 
     async def backend_sender(envelope):
@@ -26,6 +28,7 @@ async def main() -> None:
         session_manager=sessions,
         message_router=router,
         backend_sender=backend_sender,
+        backend_api=backend_api,
     )
 
     orchestrator = SDKOrchestrator(

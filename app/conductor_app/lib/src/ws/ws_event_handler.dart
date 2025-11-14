@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/chat/chat_controller.dart';
 import '../features/logs/log_view_page.dart';
+import '../features/tasks/task_list_controller.dart';
 import '../models/log_entry.dart';
 import '../models/message.dart';
 import 'message_stream_provider.dart';
@@ -28,6 +29,8 @@ class WsEventListener {
       _handleChatEvent(data);
     } else if (type == 'task_log_chunk') {
       _handleLogEvent(data);
+    } else if (type == 'task_status_update') {
+      _handleTaskStatusEvent(data);
     }
   }
 
@@ -56,6 +59,7 @@ class WsEventListener {
       'task_id': taskId,
       'role': body['role'] ?? 'user',
       'content': body['content'] ?? '',
+      'created_at': body['created_at'] ?? DateTime.now().toIso8601String(),
     });
     final notifier = _ref.read(chatProvider(taskId).notifier);
     notifier.appendLocal(message);
@@ -70,6 +74,15 @@ class WsEventListener {
         LogEntry(level: body['level'] ?? 'INFO', message: body['chunk'] ?? '');
     final notifier = _ref.read(logEntriesProvider(taskId).notifier);
     notifier.state = [...notifier.state, entry];
+  }
+
+  void _handleTaskStatusEvent(Map<String, dynamic> event) {
+    final body = event['payload'];
+    if (body is! Map<String, dynamic>) return;
+    final taskId = body['task_id'] as String?;
+    final status = body['status'] as String?;
+    if (taskId == null || status == null) return;
+    _ref.read(taskListProvider.notifier).updateTaskStatus(taskId, status);
   }
 
   Future<void> dispose() async {

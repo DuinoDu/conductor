@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
 from dataclasses import dataclass
 from typing import Any, Mapping
-from urllib import request
 
 import pathlib
 import sys
@@ -13,9 +13,10 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent
 SDK_PACKAGE = REPO_ROOT / "../sdk"
 if SDK_PACKAGE.exists() and str(SDK_PACKAGE) not in sys.path:
-    # Allow running `python test_conduct.py` without exporting PYTHONPATH.
+    # Allow running `python sdk-test.py` without exporting PYTHONPATH.
     sys.path.insert(0, str(SDK_PACKAGE))
 
+from conductor.backend import BackendApiClient
 from conductor.config import load_config
 from conductor.message import MessageRouter
 from conductor.mcp import MCPServer
@@ -34,39 +35,56 @@ class ProjectInfo:
     name: str
 
 
-def _fetch_projects(base_url: str) -> list[ProjectInfo]:
-    url = f"{base_url.rstrip('/')}/projects"
-    req = request.Request(url)
-    req.add_header("Accept", "application/json")
-    with request.urlopen(req) as resp:  # type: ignore[arg-type]
-        payload = json.load(resp)
-    projects: list[ProjectInfo] = []
-    for entry in payload:
-        proj_id = entry.get("id")
-        if isinstance(proj_id, str):
-            projects.append(ProjectInfo(id=proj_id, name=entry.get("name", proj_id)))
-    return projects
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run quick SDK smoke tests")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="create-task",
+        choices=("create-task", "list-project", "list-projects"),
+        help="Action to run (default: create-task)",
+    )
+    return parser.parse_args()
 
 
-def _resolve_project_id(base_url: str, env: Mapping[str, str]) -> ProjectInfo:
+async def _resolve_project_id(api: BackendApiClient, env: Mapping[str, str]) -> ProjectInfo:
     explicit = env.get("PROJECT_ID")
     if explicit:
         return ProjectInfo(id=explicit, name=explicit)
-    projects = _fetch_projects(base_url)
+    projects = await api.list_projects()
     if not projects:
         raise RuntimeError(
             "No projects found on the backend. POST /projects before running this script.",
         )
-    return projects[0]
+    first = projects[0]
+    return ProjectInfo(id=first.id, name=first.name or first.id)
 
 
-async def main() -> None:
+async def _list_projects(api: BackendApiClient) -> None:
+    projects = await api.list_projects()
+    if not projects:
+        print("No projects found.")
+        return
+    print("Projects available:")
+    for project in projects:
+        label = project.name or "<unnamed>"
+        desc = f" - {project.description}" if project.description else ""
+        print(f"- {label} ({project.id}){desc}")
+
+
+async def main(args: argparse.Namespace) -> None:
     # Ensure local connections bypass proxies so requests hit localhost.
     os.environ.setdefault("NO_PROXY", "127.0.0.1,localhost")
     os.environ.setdefault("no_proxy", "127.0.0.1,localhost")
 
     config = load_config()
-    project = _resolve_project_id(str(config.backend_url), os.environ)
+    backend_api = BackendApiClient(config)
+
+    if args.command in ("list-project", "list-projects"):
+        await _list_projects(backend_api)
+        return
+
+    project = await _resolve_project_id(backend_api, os.environ)
     print(f"Using project {project.name} ({project.id})")
 
     sessions = SessionManager()
@@ -82,6 +100,7 @@ async def main() -> None:
         session_manager=sessions,
         message_router=router,
         backend_sender=backend_sender,
+        backend_api=backend_api,
     )
     orchestrator = SDKOrchestrator(
         ws_client=ws_client,
@@ -90,7 +109,7 @@ async def main() -> None:
         mcp_server=mcp_server,
         reporter=reporter,
     )
-    
+
     print("DEBUG: orchestrator.start()")
     await orchestrator.start()
     try:
@@ -152,4 +171,5 @@ async def _listen_for_messages(mcp_server: MCPServer, task_id: str, *, duration:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    CLI_ARGS = _parse_args()
+    asyncio.run(main(CLI_ARGS))

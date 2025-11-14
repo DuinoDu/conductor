@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/message.dart';
 import 'chat_controller.dart';
@@ -78,16 +79,38 @@ class _ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alignment =
-        message.role == 'user' ? Alignment.centerRight : Alignment.centerLeft;
-    final color = message.role == 'user' ? Colors.blue[200] : Colors.grey[300];
+    final isUser = message.role == 'user';
+    final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
+    final color = isUser ? Colors.blue[200] : Colors.grey[300];
+    final createdAt = message.createdAt;
+    final timestamp =
+        createdAt != null ? DateFormat('HH:mm').format(createdAt.toLocal()) : null;
+    final timeStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.black54,
+            ) ??
+        const TextStyle(fontSize: 11, color: Colors.black54);
+
     return Align(
       alignment: alignment,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: color, borderRadius: BorderRadius.circular(12)),
-        child: Text(message.content),
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(message.content),
+            if (timestamp != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(timestamp, style: timeStyle),
+              ),
+          ],
+        ),
       ),
     );
   }

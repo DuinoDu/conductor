@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable, Dict, List
 from uuid import uuid4
 
+from conductor.backend import BackendApiClient
 from conductor.config import ConductorConfig
 from conductor.message import MessageRouter
 from conductor.session import SessionManager
@@ -23,11 +24,13 @@ class MCPServer:
         session_manager: SessionManager,
         message_router: MessageRouter,
         backend_sender: Callable[[Dict[str, Any]], Awaitable[None]],
+        backend_api: BackendApiClient,
     ) -> None:
         self._config = config
         self._sessions = session_manager
         self._router = message_router
         self._backend_sender = backend_sender
+        self._backend_api = backend_api
         self._tools: Dict[str, ToolFunc] = {}
         self._register_tools()
 
@@ -37,6 +40,7 @@ class MCPServer:
             "send_message": self._tool_send_message,
             "receive_messages": self._tool_receive_messages,
             "ack_messages": self._tool_ack_messages,
+            "list_projects": self._tool_list_projects,
         }
 
     async def handle_request(self, tool_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -107,3 +111,9 @@ class MCPServer:
     async def _tool_ack_messages(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         success = await self._sessions.ack(payload["task_id"], payload["ack_token"])
         return {"status": "ok" if success else "ignored"}
+
+    async def _tool_list_projects(self, _payload: Dict[str, Any]) -> Dict[str, Any]:
+        projects = await self._backend_api.list_projects()
+        return {
+            "projects": [project.as_dict() for project in projects],
+        }

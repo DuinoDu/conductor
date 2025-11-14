@@ -13,7 +13,9 @@ deps: deps-sdk deps-backend
 deps-sdk: $(STAMP)
 
 $(STAMP): sdk/requirements-dev.txt
-	$(PYTHON) -m venv $(VENV)
+	if [ ! "$(VENV)" ]; then \
+		$(PYTHON) -m venv $(VENV); \
+	fi
 	$(PIP) install --upgrade pip
 	$(PIP) install -r sdk/requirements-dev.txt
 	touch $(STAMP)
@@ -37,7 +39,7 @@ test-backend: deps-backend
 test-app:
 	cd $(APP_DIR); flutter test
 
-test: backend-test sdk-test test-app
+test: test-backend test-sdk test-app
 
 backend-build: deps-backend
 	npm --prefix $(BACKEND_DIR) run build
