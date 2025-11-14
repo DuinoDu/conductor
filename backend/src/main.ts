@@ -49,10 +49,11 @@ async function bootstrap() {
       const upgrade = req?.headers?.['upgrade'] ?? '';
       const conn = req?.headers?.['connection'] ?? '';
       const origin = req?.headers?.['origin'] ?? '';
+      const protocol = req?.headers?.['sec-websocket-protocol'] ?? '';
       const swv = req?.headers?.['sec-websocket-version'] ?? '';
       const url = req?.url ?? '';
       upgradeLogger.log(
-        `HTTP upgrade: url=${url} host=${host} upgrade=${upgrade} connection=${conn} origin=${origin} sec-websocket-version=${swv}`,
+        `HTTP upgrade: url=${url} host=${host} upgrade=${upgrade} connection=${conn} origin=${origin} protocol=${protocol} sec-websocket-version=${swv}`,
       );
       const pathname = (() => {
         try {

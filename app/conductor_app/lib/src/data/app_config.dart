@@ -7,6 +7,12 @@ class AppConfig {
     const wsBase = String.fromEnvironment('WS_URL', defaultValue: '');
     final resolvedWs =
         wsBase.isNotEmpty ? _normalizeWsUrl(wsBase) : _deriveWsUrl(apiBase);
+    assert(() {
+      // Helpful during device debugging
+      // ignore: avoid_print
+      print('AppConfig: baseUrl=' + apiBase + ' wsUrl=' + resolvedWs);
+      return true;
+    }());
     return AppConfig(baseUrl: apiBase, wsUrl: resolvedWs);
   }
 

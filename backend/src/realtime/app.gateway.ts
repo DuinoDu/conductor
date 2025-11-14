@@ -27,9 +27,39 @@ export const setupAppGateway = (app: INestApplication): WebSocketServer => {
     });
     logger.log(`App client connected (${connectionId.slice(0, 8)})`);
 
-    socket.on('close', () => {
+    // Heartbeat: mark alive when we receive a pong
+    let isAlive = true;
+    const heartbeat = () => {
+      isAlive = true;
+      realtimeHub.heartbeat(connectionId);
+    };
+    socket.on('pong', heartbeat);
+
+    // Periodic ping to keep NATs/routers happy and detect half-open
+    const interval = setInterval(() => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      if (!isAlive) {
+        try {
+          socket.terminate();
+        } catch {}
+        return;
+      }
+      isAlive = false;
+      try {
+        socket.ping();
+      } catch {}
+    }, 25_000);
+
+    socket.on('close', (code: number, reason: Buffer) => {
       realtimeHub.unregister(connectionId);
-      logger.log(`App client disconnected (${connectionId.slice(0, 8)})`);
+      clearInterval(interval);
+      const reasonText = reason && reason.length > 0 ? reason.toString('utf8') : '';
+      logger.log(
+        `App client disconnected (${connectionId.slice(0, 8)}) code=${code}` +
+          (reasonText ? ` reason=${reasonText}` : ''),
+      );
     });
     socket.on('error', (err) => logger.warn(`App socket error: ${err}`));
   });

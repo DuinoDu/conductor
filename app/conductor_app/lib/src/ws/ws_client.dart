@@ -43,6 +43,11 @@ class AppWebSocketClient {
     if (_channel != null || _connecting) {
       return;
     }
+    assert(() {
+      // ignore: avoid_print
+      print('[WS] connect() uri=$uri');
+      return true;
+    }());
     await _attemptConnect();
   }
 
@@ -81,13 +86,35 @@ class AppWebSocketClient {
       _subscription = channel.stream.listen(
         _controller.add,
         onError: (error) {
+          assert(() {
+            // ignore: avoid_print
+            print('[WS] onError: ' + error.toString());
+            return true;
+          }());
           _controller.addError(error);
           _handleConnectionLoss();
         },
-        onDone: _handleConnectionLoss,
+        onDone: () {
+          assert(() {
+            // ignore: avoid_print
+            print('[WS] onDone (stream closed)');
+            return true;
+          }());
+          _handleConnectionLoss();
+        },
       );
       _setStatus(WebSocketConnectionState.connected);
+      assert(() {
+        // ignore: avoid_print
+        print('[WS] connected');
+        return true;
+      }());
     } catch (error) {
+      assert(() {
+        // ignore: avoid_print
+        print('[WS] connect() error: ' + error.toString());
+        return true;
+      }());
       _controller.addError(error);
       _handleConnectionLoss();
     } finally {

@@ -1,4 +1,4 @@
-.PHONY: sdk-test sdk-integration-test backend-test test run backend-build backend-start infra-up infra-down
+.PHONY: sdk-test sdk-integration-test backend-test test run backend-build backend-start run-ios run-web
 
 PYTHON ?= python3
 VENV ?= .venv
@@ -9,6 +9,19 @@ BACKEND_DIR := backend
 BACKEND_NODE_MODULES := $(BACKEND_DIR)/node_modules
 APP_DIR := app/conductor_app
 FLUTTER ?= $(HOME)/opt/flutter/bin/flutter
+
+# Try to detect the active local IP (override with `HOST_IP=x.x.x.x` if needed)
+# Prefer RFC1918 LAN IPs (avoid CGNAT like 100.x from Tailscale)
+HOST_IP ?= $(shell sh -c '\
+  for iface in en0 en1; do \
+    ip=$$(ipconfig getifaddr $$iface 2>/dev/null || true); \
+    echo $$ip; \
+  done | \
+  awk \'/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/ {print; exit}\' || true';)
+# Fallback to first non-loopback if nothing matched
+HOST_IP := $(or $(HOST_IP),$(shell ifconfig | awk '/inet / && $$2 != "127.0.0.1" {print $$2}' | egrep '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -n1))
+API_URL := http://$(HOST_IP):4000
+WS_FULL_URL := ws://$(HOST_IP):4000/ws/app
 
 .PHONY: deps deps-sdk deps-backend
 deps: deps-sdk deps-backend
@@ -49,8 +62,13 @@ run: backend-build
 	cd $(BACKEND_DIR) && PORT=4000 HOST=0.0.0.0 npm start
 
 run-web:
+	@if [ -z "$(HOST_IP)" ]; then \
+        echo "Could not determine HOST_IP automatically. Set HOST_IP=x.x.x.x and retry."; \
+        exit 1; \
+    fi
+	@echo "Using HOST_IP=$(HOST_IP) API_URL=$(API_URL)"
 	cd $(APP_DIR) && \
-	$(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.219.59:4000
+    $(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=$(API_URL)
 
 # >> xcrun simctl list
 SIMULATOR=8887531C-E1FB-4AF9-A96F-FBD41773E39C
@@ -60,8 +78,28 @@ start-simulator:
 	xcrun simctl boot $(SIMULATOR)
 
 run-ios:
+	@if [ -z "$(HOST_IP)" ]; then \
+        echo "Could not determine HOST_IP automatically. Pass HOST_IP=x.x.x.x (your Mac IP)."; \
+        exit 1; \
+    fi
+	@echo "Using HOST_IP=$(HOST_IP) API_URL=$(API_URL) WS_URL=$(WS_FULL_URL)"
 	cd $(APP_DIR) && \
-	$(FLUTTER) run --device-id $(SIMULATOR) --dart-define=API_BASE_URL=http://100.72.219.59:4000 --dart-define=WS_URL=ws://100.72.219.59:4000/ws/app
+    $(FLUTTER) run --device-id $(IPHONE11) \
+        --dart-define=API_BASE_URL=$(API_URL) \
+        --dart-define=WS_URL=$(WS_FULL_URL)
+
+build-ios:
+	@if [ -z "$(HOST_IP)" ]; then \
+        echo "Could not determine HOST_IP automatically. Pass HOST_IP=x.x.x.x (your Mac IP)."; \
+        exit 1; \
+    fi
+	cd $(APP_DIR) && \
+    $(FLUTTER) build ios \
+        --dart-define=API_BASE_URL=$(API_URL) \
+        --dart-define=WS_URL=$(WS_FULL_URL)
+
+# Backward-compat alias matching docs
+start-backend: run
 
 run-android:
 

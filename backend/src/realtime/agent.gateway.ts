@@ -130,6 +130,24 @@ export const setupAgentGateway = (app: INestApplication): WebSocketServer => {
       },
     });
 
+    // Heartbeat keep-alive like app gateway
+    let isAlive = true;
+    const heartbeat = () => {
+      isAlive = true;
+      realtimeHub.heartbeat(connectionId);
+    };
+    socket.on('pong', heartbeat);
+
+    const interval = setInterval(() => {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      if (!isAlive) {
+        try { socket.terminate(); } catch {}
+        return;
+      }
+      isAlive = false;
+      try { socket.ping(); } catch {}
+    }, 25_000);
+
     socket.on('message', async (raw) => {
       try {
         const event = parseEvent(raw);
@@ -159,9 +177,11 @@ export const setupAgentGateway = (app: INestApplication): WebSocketServer => {
       }
     });
 
-    socket.on('close', () => {
+    socket.on('close', (code: number, reason: Buffer) => {
       realtimeHub.unregister(connectionId);
-      logger.log('Agent disconnected');
+      clearInterval(interval);
+      const reasonText = reason && reason.length > 0 ? reason.toString('utf8') : '';
+      logger.log(`Agent disconnected code=${code}` + (reasonText ? ` reason=${reasonText}` : ''));
     });
     socket.on('error', (err) => logger.warn(`Agent socket error: ${err}`));
   });
