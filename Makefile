@@ -70,6 +70,9 @@ infra-up:
 infra-down:
 	docker compose -f docker-compose.local.yml down
 
+clean:
+	cd $(APP_DIR) && flutter clean
+
 KILL_PORTS := 4000 6150
 
 kill:
