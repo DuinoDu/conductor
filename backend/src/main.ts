@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
@@ -27,13 +28,55 @@ function resolveDataSource() {
   return AppDataSource;
 }
 
+function isTruthyFlag(v?: string) {
+  if (!v) return false;
+  const s = v.toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
 async function bootstrap() {
   const dataSource = resolveDataSource();
   await dataSource.initialize();
   console.log(`Backend data source initialized (${dataSource.options.type})`);
   setActiveDataSource(dataSource);
 
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // Optional HTTPS support via environment flags.
+  const httpsEnabled = isTruthyFlag(process.env.HTTPS);
+  let httpsOptions: { key: Buffer; cert: Buffer } | undefined;
+  if (httpsEnabled) {
+    const keyPath = process.env.HTTPS_KEY_PATH;
+    const certPath = process.env.HTTPS_CERT_PATH;
+    const httpsLogger = new Logger('HTTPS');
+    if (!keyPath || !certPath) {
+      httpsLogger.warn(
+        'HTTPS requested but HTTPS_KEY_PATH/HTTPS_CERT_PATH not set; falling back to HTTP.',
+      );
+    } else if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+      httpsLogger.warn(
+        `HTTPS key/cert not found (key: ${keyPath}, cert: ${certPath}); falling back to HTTP.`,
+      );
+    } else {
+      try {
+        httpsOptions = {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        };
+        httpsLogger.log(
+          `Enabled HTTPS with key=${keyPath} cert=${certPath} (${process.env.PORT || 4000})`,
+        );
+      } catch (e) {
+        httpsLogger.warn(
+          `Failed to read HTTPS key/cert: ${(e as Error).message}; falling back to HTTP.`,
+        );
+        httpsOptions = undefined;
+      }
+    }
+  }
+
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    httpsOptions,
+  });
   // Attach a concrete logger to flush buffered Nest logs and enable Logger() output
   app.useLogger(new Logger());
 
@@ -102,7 +145,8 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT || 4000);
   await app.listen(port);
-  console.log(`Conductor backend listening on http://localhost:${port}`);
+  const scheme = httpsOptions ? 'https' : 'http';
+  console.log(`Conductor backend listening on ${scheme}://localhost:${port}`);
 }
 
 bootstrap().catch((err) => {

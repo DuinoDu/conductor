@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "conductor": {
+      "command": "/Users/bytedance/ws/conductor/.venv/bin/python",
+      "args": [
+        "-m",
+        "conductor.cli"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/bytedance/ws/conductor/sdk",
+        "CONDUCTOR_CONFIG": "/Users/bytedance/ws/conductor/scripts/conductor.config.yaml",
+        "CONDUCTOR_AGENT_TOKEN": "REPLACE_WITH_YOUR_AGENT_TOKEN",
+        "CONDUCTOR_BACKEND_URL": "http://localhost:4000",
+        "CONDUCTOR_WS_URL": "ws://localhost:4000/ws/agent"
+      }
+    }
+  }
+}
+

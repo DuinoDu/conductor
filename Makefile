@@ -1,4 +1,4 @@
-.PHONY: sdk-test sdk-integration-test backend-test test run backend-build backend-start run-ios run-web
+.PHONY: sdk-test sdk-integration-test backend-test test run run-https tunnel-ngrok backend-build backend-start run-ios run-web
 
 PYTHON ?= python3
 VENV ?= .venv
@@ -19,9 +19,11 @@ HOST_IP ?= $(shell sh -c '\
   done | \
   awk \'/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/ {print; exit}\' || true';)
 # Fallback to first non-loopback if nothing matched
-HOST_IP := $(or $(HOST_IP),$(shell ifconfig | awk '/inet / && $$2 != "127.0.0.1" {print $$2}' | egrep '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -n1))
-API_URL := http://$(HOST_IP):4000
-WS_FULL_URL := ws://$(HOST_IP):4000/ws/app
+HOST_IP := $(or $(HOST_IP),$(shell ifconfig | awk '/inet / && $$2 != "127.0.0.1" {print $$2}' | head -n1))
+# API_URL := http://$(HOST_IP):4000
+# WS_FULL_URL := ws://$(HOST_IP):4000/ws/app
+API_URL := https://$(HOST_IP):4000
+WS_FULL_URL := wss://$(HOST_IP):4000/ws/app
 
 .PHONY: deps deps-sdk deps-backend
 deps: deps-sdk deps-backend
@@ -59,7 +61,18 @@ backend-build: deps-backend
 	npm --prefix $(BACKEND_DIR) run build
 
 run: backend-build
-	cd $(BACKEND_DIR) && PORT=4000 HOST=0.0.0.0 npm start
+	cd $(BACKEND_DIR) && PORT=4000 HOST=100.72.219.59 npm start
+
+run-https: backend-build
+	# Launch backend over HTTPS on port 4000 using dev certs
+	cd $(BACKEND_DIR) && \
+	  PORT=4000 HTTPS=1 HOST=100.72.219.59 \
+	  HTTPS_KEY_PATH=certs/dev.key HTTPS_CERT_PATH=certs/dev.crt \
+	  npm start
+
+tunnel-ngrok:
+	@echo "Starting ngrok tunnel for backend (http://localhost:4000) ..."
+	bash scripts/ngrok_tunnel.sh 4000
 
 run-web:
 	@if [ -z "$(HOST_IP)" ]; then \

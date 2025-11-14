@@ -26,3 +26,18 @@ When running on a physical iOS device, `localhost` points to the phone, not your
   - If auto-detection fails, run `make run-ios HOST_IP=192.168.x.x`.
 
 The iOS `Info.plist` is configured to allow cleartext HTTP for development via App Transport Security.
+
+## Use ngrok for HTTPS (no cert install)
+
+You can expose the local backend over a public HTTPS domain using ngrok, so the iPhone trusts the certificate without extra steps.
+
+- Install ngrok and set your authtoken (free account):
+  - `brew install ngrok/ngrok/ngrok`
+  - `export NGROK_AUTHTOKEN=<your_token>`
+- Start the tunnel and get the public URLs:
+  - `make tunnel-ngrok`
+  - Copy the printed `NGROK_HTTPS_URL` and `NGROK_WSS_URL`.
+- Run the app against ngrok:
+  - `flutter run --dart-define=API_BASE_URL=<NGROK_HTTPS_URL> --dart-define=WS_URL=<NGROK_WSS_URL>`
+
+Note: the backend must be running locally on port 4000 (`make run`).
