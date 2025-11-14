@@ -6,16 +6,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeChatRepository implements ChatRepository {
-  FakeChatRepository(this._messages);
+  FakeChatRepository(this._messages, {this.shouldFail = false});
 
   final List<Message> _messages;
+  final bool shouldFail;
+  int sendCount = 0;
+  String? lastContent;
 
   @override
   Future<List<Message>> fetchMessages(String taskId) async => _messages;
 
   @override
   Future<void> sendMessage(String taskId,
-      {required String content, String role = 'sdk'}) async {}
+      {required String content, String role = 'sdk'}) async {
+    sendCount += 1;
+    lastContent = content;
+    if (shouldFail) {
+      throw Exception('send failed');
+    }
+  }
 }
 
 void main() {
@@ -31,5 +40,36 @@ void main() {
 
     final data = await container.read(chatProvider('t1').future);
     expect(data, hasLength(1));
+  });
+
+  test('sendMessage appends local message immediately', () async {
+    final repo = FakeChatRepository(const []);
+    final container = ProviderContainer(overrides: [
+      chatRepositoryProvider.overrideWithValue(repo),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(chatProvider('t1').future);
+    await container.read(chatProvider('t1').notifier).sendMessage('hello');
+
+    final messages = container.read(chatProvider('t1')).value!;
+    expect(messages.single.content, 'hello');
+    expect(repo.sendCount, 1);
+  });
+
+  test('sendMessage rolls back optimistic entry on error', () async {
+    final repo = FakeChatRepository(const [], shouldFail: true);
+    final container = ProviderContainer(overrides: [
+      chatRepositoryProvider.overrideWithValue(repo),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(chatProvider('t1').future);
+    expect(
+      () => container.read(chatProvider('t1').notifier).sendMessage('oops'),
+      throwsException,
+    );
+    final state = container.read(chatProvider('t1'));
+    expect(state.value, isEmpty);
   });
 }
