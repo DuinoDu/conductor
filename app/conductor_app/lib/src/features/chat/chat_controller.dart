@@ -29,7 +29,27 @@ class ChatController
   }
 
   Future<void> sendMessage(String content) async {
-    await _repository.sendMessage(_taskId, content: content);
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    final optimisticMessage = Message(
+      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      taskId: _taskId,
+      role: 'sdk',
+      content: trimmed,
+      createdAt: DateTime.now(),
+    );
+    appendLocal(optimisticMessage);
+    try {
+      await _repository.sendMessage(_taskId, content: trimmed);
+    } catch (error) {
+      final current = state.value ?? [];
+      state = AsyncData(
+        current.where((message) => message.id != optimisticMessage.id).toList(),
+      );
+      rethrow;
+    }
   }
 
   void appendLocal(Message message) {
