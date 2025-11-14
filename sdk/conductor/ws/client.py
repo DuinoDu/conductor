@@ -82,6 +82,7 @@ class ConductorWebSocketClient:
 
                     self._conn = await self._connect_impl(
                         self._url,
+                        compression=None,
                         **connect_kwargs,
                     )
                     self._listen_task = asyncio.create_task(

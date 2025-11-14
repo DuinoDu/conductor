@@ -4,6 +4,7 @@ import { INestApplication, Logger } from '@nestjs/common';
 import WebSocket, { WebSocketServer } from 'ws';
 
 import { RealtimeHub } from './realtime.hub';
+import { RoutePayload } from './types';
 
 const logger = new Logger('AppGateway');
 
@@ -41,9 +42,46 @@ const sendEnvelope = (socket: WebSocket, payload: unknown) => {
   if (socket.readyState !== WebSocket.OPEN) {
     return;
   }
+  const envelope = normalizeAppEnvelope(payload);
+  if (!envelope) {
+    return;
+  }
   try {
-    socket.send(JSON.stringify(payload));
+    socket.send(JSON.stringify(envelope));
   } catch (error) {
     logger.warn(`Failed to deliver WS payload: ${(error as Error).message}`);
   }
+};
+
+const normalizeAppEnvelope = (
+  payload: unknown,
+): { type: string; payload: unknown } | null => {
+  if (isRoutePayload(payload)) {
+    return {
+      type: payload.type,
+      payload: payload.data,
+    };
+  }
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'type' in payload &&
+    typeof (payload as { type?: unknown }).type === 'string'
+  ) {
+    const value = payload as { type: string; payload?: unknown };
+    return { type: value.type, payload: 'payload' in value ? value.payload : payload };
+  }
+  return null;
+};
+
+const isRoutePayload = (value: unknown): value is RoutePayload => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as RoutePayload;
+  return (
+    typeof candidate.type === 'string' &&
+    'data' in candidate &&
+    typeof candidate.data !== 'undefined'
+  );
 };
