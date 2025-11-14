@@ -27,6 +27,26 @@ async def test_backend_user_message_enqueues():
 
 
 @pytest.mark.asyncio
+async def test_backend_task_action_formats_command():
+    sessions = SessionManager()
+    await sessions.add_session("task42", "sess42", "proj1")
+    router = MessageRouter(sessions)
+    payload = {
+        "type": "task_action",
+        "payload": {
+            "task_id": "task42",
+            "action": "run_tests",
+            "args": {"command": "pytest sdk/tests -k smoke"},
+        },
+    }
+    await router.handle_backend_event(payload)
+    messages = await sessions.pop_messages("task42")
+    assert len(messages) == 1
+    assert messages[0].role == "action"
+    assert messages[0].content == "run_tests: pytest sdk/tests -k smoke"
+
+
+@pytest.mark.asyncio
 async def test_outbound_handler_invoked():
     sessions = SessionManager()
     router = MessageRouter(sessions)

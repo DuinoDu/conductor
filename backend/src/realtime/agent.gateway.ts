@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 import { INestApplication, Logger } from '@nestjs/common';
 import type { IncomingMessage } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -5,6 +7,8 @@ import WebSocket, { WebSocketServer } from 'ws';
 import { MessageService } from '../message';
 import { MessageRole } from '../entities';
 import { TaskService } from '../project-task';
+import { RealtimeHub } from './realtime.hub';
+import { RoutePayload } from './types';
 
 type AgentEvent =
   | {
@@ -105,6 +109,7 @@ export const setupAgentGateway = (app: INestApplication): void => {
   const httpServer = app.getHttpServer();
   const taskService = app.get(TaskService);
   const messageService = app.get(MessageService);
+  const realtimeHub = app.get(RealtimeHub);
 
   const wss = new WebSocketServer({
     server: httpServer,
@@ -114,6 +119,18 @@ export const setupAgentGateway = (app: INestApplication): void => {
   wss.on('connection', (socket, request) => {
     const token = extractToken(request);
     logger.log(`Agent connected${token ? ` token=${token.slice(0, 6)}…` : ''}`);
+    const connectionId = randomUUID();
+    realtimeHub.register({
+      id: connectionId,
+      kind: 'agent',
+      projectIds: ['*'],
+      send: (payload) => {
+        const envelope = normalizeAgentEnvelope(payload);
+        if (envelope) {
+          sendEnvelope(socket, envelope);
+        }
+      },
+    });
 
     socket.on('message', async (raw) => {
       try {
@@ -144,10 +161,50 @@ export const setupAgentGateway = (app: INestApplication): void => {
       }
     });
 
-    socket.on('close', () => logger.log('Agent disconnected'));
+    socket.on('close', () => {
+      realtimeHub.unregister(connectionId);
+      logger.log('Agent disconnected');
+    });
     socket.on('error', (err) => logger.warn(`Agent socket error: ${err}`));
   });
 
   wss.on('error', (err) => logger.error(`Agent WebSocket server error: ${err}`));
   logger.log('Agent WebSocket gateway ready at /ws/agent');
+};
+
+const normalizeAgentEnvelope = (
+  payload: unknown,
+): { type: string; payload: unknown } | null => {
+  if (isRoutePayload(payload)) {
+    return {
+      type: payload.type,
+      payload: payload.data,
+    };
+  }
+  if (isTypedEnvelope(payload)) {
+    const value = payload as { type: string; payload?: unknown };
+    return { type: value.type, payload: 'payload' in value ? value.payload : payload };
+  }
+  return null;
+};
+
+const isRoutePayload = (value: unknown): value is RoutePayload => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as RoutePayload;
+  return (
+    typeof candidate.type === 'string' &&
+    'data' in candidate &&
+    typeof candidate.data !== 'undefined'
+  );
+};
+
+const isTypedEnvelope = (value: unknown): value is { type: string } => {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'type' in value &&
+    typeof (value as { type?: unknown }).type === 'string'
+  );
 };

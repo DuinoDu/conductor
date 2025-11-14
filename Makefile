@@ -50,11 +50,7 @@ run: backend-build
 
 run-web:
 	cd $(APP_DIR) && \
-<<<<<<< Updated upstream
-	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://0.0.0.0:4000
-=======
 	$(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.232.210:4000
->>>>>>> Stashed changes
 
 # >> xcrun simctl list
 SIMULATOR=8887531C-E1FB-4AF9-A96F-FBD41773E39C
@@ -65,7 +61,7 @@ start-simulator:
 
 run-ios:
 	cd $(APP_DIR) && \
-	flutter run --device-id $(SIMULATOR)
+	$(FLUTTER) run --device-id $(SIMULATOR)
 
 run-android:
 

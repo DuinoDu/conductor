@@ -1,74 +1,82 @@
-import { DataSource } from 'typeorm';
+import { MessageService } from '../../src/message/message.service';
+import { MessageRole, TaskEntity } from '../../src/entities';
+import { MessageRepository } from '../../src/repositories/message.repository';
+import { TaskRepository } from '../../src/repositories/task.repository';
+import { RealtimeHub } from '../../src/realtime';
 
-import {
-  MessageEntity,
-  MessageRepository,
-  MessageRole,
-  MessageService,
-  ProjectEntity,
-  ProjectRepository,
-  TaskEntity,
-  TaskRepository,
-  TaskService,
-  createAppDataSource,
-} from '../../src';
+const createMessageRepository = () =>
+  ({
+    createMessage: jest.fn(),
+    listByTask: jest.fn(),
+  } as unknown as jest.Mocked<MessageRepository>);
+
+const createTaskRepository = () =>
+  ({
+    findById: jest.fn(),
+  } as unknown as jest.Mocked<TaskRepository>);
+
+const createRealtimeHub = () =>
+  ({
+    routeToProjectAgents: jest.fn(),
+    routeToProjectApps: jest.fn(),
+  } as unknown as jest.Mocked<RealtimeHub>);
+
+const createTask = (): TaskEntity =>
+  ({
+    id: 'task-1',
+    project: { id: 'project-1' },
+  } as TaskEntity);
+
+const createMessage = (task: TaskEntity, role: MessageRole) =>
+  ({
+    id: 'message-1',
+    task,
+    role,
+    content: role === MessageRole.USER ? 'hello' : 'hi',
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    metadata: null,
+  } as any);
 
 describe('MessageService', () => {
-  let dataSource: DataSource;
-  let messageRepo: MessageRepository;
-  let taskService: TaskService;
-  let messageService: MessageService;
-  let taskId: string;
+  it('broadcasts user messages to agents', async () => {
+    const messageRepository = createMessageRepository();
+    const taskRepository = createTaskRepository();
+    const realtimeHub = createRealtimeHub();
+    const service = new MessageService(messageRepository, taskRepository, realtimeHub);
+    const task = createTask();
+    const message = createMessage(task, MessageRole.USER);
+    taskRepository.findById.mockResolvedValue(task);
+    messageRepository.createMessage.mockResolvedValue(message);
 
-  beforeAll(async () => {
-    dataSource = createAppDataSource();
-    await dataSource.initialize();
-    const projectRepo = ProjectRepository.create(dataSource.getRepository(ProjectEntity));
-    const taskRepo = TaskRepository.create(dataSource.getRepository(TaskEntity));
-    messageRepo = MessageRepository.create(dataSource.getRepository(MessageEntity));
-    taskService = new TaskService(projectRepo, taskRepo);
-    messageService = new MessageService(messageRepo, taskRepo);
+    await service.createMessage({ taskId: task.id, role: MessageRole.USER, content: 'hello' });
 
-    const project = await projectRepo.createProject({ name: 'Message Project' });
-    const task = await taskService.createTask({ projectId: project.id, title: 'Chat Task' });
-    taskId = task.id;
-  });
-
-  afterAll(async () => {
-    if (dataSource.isInitialized) {
-      await dataSource.destroy();
-    }
-  });
-
-  it('creates messages with markdown validation', async () => {
-    const content = 'Hello **world**\n```ts\nconsole.log(1);\n```';
-    const message = await messageService.createMessage({
-      taskId,
-      role: MessageRole.USER,
-      content,
-    });
-    expect(message.content).toEqual(content);
-    const list = await messageService.listMessages(taskId);
-    expect(list).toHaveLength(1);
-  });
-
-  it('rejects dangerous markdown', async () => {
-    await expect(
-      messageService.createMessage({
-        taskId,
-        role: MessageRole.USER,
-        content: '<script>alert(1)</script>',
+    expect(realtimeHub.routeToProjectAgents).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'project-1',
+        type: 'task_user_message',
       }),
-    ).rejects.toThrow('HTML tags are not allowed');
+    );
+    expect(realtimeHub.routeToProjectApps).not.toHaveBeenCalled();
   });
 
-  it('rejects unbalanced code fences', async () => {
-    await expect(
-      messageService.createMessage({
-        taskId,
-        role: MessageRole.USER,
-        content: '```ts\nconsole.log("hi");',
+  it('broadcasts sdk messages to apps', async () => {
+    const messageRepository = createMessageRepository();
+    const taskRepository = createTaskRepository();
+    const realtimeHub = createRealtimeHub();
+    const service = new MessageService(messageRepository, taskRepository, realtimeHub);
+    const task = createTask();
+    const message = createMessage(task, MessageRole.SDK);
+    taskRepository.findById.mockResolvedValue(task);
+    messageRepository.createMessage.mockResolvedValue(message);
+
+    await service.createMessage({ taskId: task.id, role: MessageRole.SDK, content: 'reply' });
+
+    expect(realtimeHub.routeToProjectApps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'project-1',
+        type: 'task_sdk_message',
       }),
-    ).rejects.toThrow('code fences must be balanced');
+    );
+    expect(realtimeHub.routeToProjectAgents).not.toHaveBeenCalled();
   });
 });

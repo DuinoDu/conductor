@@ -44,6 +44,22 @@ describe('RealtimeHub', () => {
     expect(otherAgent.send).not.toHaveBeenCalled();
   });
 
+  it('routes to wildcard agents when no explicit project match exists', () => {
+    const hub = new RealtimeHub();
+    const wildcardAgent = createConnection({ kind: 'agent', projectIds: ['*'] });
+    hub.register(wildcardAgent);
+
+    const payload: RoutePayload = {
+      taskId: 'task-3',
+      projectId: 'project-9',
+      type: 'task_user_message',
+      data: { content: 'Hi' },
+    };
+
+    hub.routeToProjectAgents(payload);
+    expect(wildcardAgent.send).toHaveBeenCalledWith(payload);
+  });
+
   it('tracks heartbeats and prunes stale connections', () => {
     const hub = new RealtimeHub({ heartbeatTimeoutMs: 1000 });
     const conn = createConnection();

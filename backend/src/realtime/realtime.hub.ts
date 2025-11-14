@@ -55,7 +55,7 @@ export class RealtimeHub extends EventEmitter {
   routeToProjectApps(payload: RoutePayload): void {
     this.dispatch(
       payload,
-      (connection) => connection.kind === 'app' && connection.projectIds.includes(payload.projectId),
+      (connection) => connection.kind === 'app' && isProjectMatch(connection.projectIds, payload.projectId),
     );
   }
 
@@ -63,7 +63,7 @@ export class RealtimeHub extends EventEmitter {
     this.dispatch(
       payload,
       (connection) =>
-        connection.kind === 'agent' && connection.projectIds.includes(payload.projectId),
+        connection.kind === 'agent' && isProjectMatch(connection.projectIds, payload.projectId),
     );
   }
 
@@ -83,3 +83,7 @@ export class RealtimeHub extends EventEmitter {
     }
   }
 }
+
+const isProjectMatch = (projectIds: string[], projectId: string): boolean => {
+  return projectIds.includes(projectId) || projectIds.includes('*');
+};

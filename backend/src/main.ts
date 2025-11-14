@@ -9,7 +9,7 @@ import {
   createAppDataSource,
   setActiveDataSource,
 } from './database';
-import { setupAgentGateway } from './realtime';
+import { setupAgentGateway, setupAppGateway } from './realtime';
 
 dotenv.config();
 
@@ -54,6 +54,7 @@ async function bootstrap() {
   const port = Number(process.env.PORT || 4000);
   await app.listen(port);
   setupAgentGateway(app);
+  setupAppGateway(app);
   console.log(`Conductor backend listening on http://localhost:${port}`);
 }
 
