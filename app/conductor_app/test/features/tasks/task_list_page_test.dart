@@ -15,7 +15,11 @@ class FakeTaskRepository implements TaskRepository {
   final List<Task> _tasks;
 
   @override
-  Future<List<Task>> fetchTasks() async => _tasks;
+  Future<List<Task>> fetchTasks({String? projectId, String? status}) async {
+    return _tasks
+        .where((task) => projectId == null || task.projectId == projectId)
+        .toList(growable: false);
+  }
 
   @override
   Future<Task> createTask({required String projectId, required String title}) async {

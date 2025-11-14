@@ -11,7 +11,11 @@ class FakeTaskRepository implements TaskRepository {
   final List<Task> _tasks;
 
   @override
-  Future<List<Task>> fetchTasks() async => [..._tasks];
+  Future<List<Task>> fetchTasks({String? projectId, String? status}) async {
+    return _tasks
+        .where((task) => projectId == null || task.projectId == projectId)
+        .toList(growable: false);
+  }
 
   @override
   Future<Task> createTask({required String projectId, required String title}) async {
@@ -72,5 +76,21 @@ void main() {
     notifier.updateTaskStatus('1', 'RUNNING');
     final tasks = container.read(taskListProvider).value!;
     expect(tasks.first.status, 'RUNNING');
+  });
+  test('changing project filter refreshes data set', () async {
+    final container = ProviderContainer(overrides: [
+      taskRepositoryProvider.overrideWithValue(
+        FakeTaskRepository(const [
+          Task(id: '1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(id: '2', projectId: 'p2', title: 'Other', status: 'CREATED'),
+        ]),
+      ),
+    ]);
+    addTearDown(container.dispose);
+
+    await container.read(taskListProvider.future);
+    container.read(currentProjectFilterProvider.notifier).state = 'p2';
+    final filtered = await container.read(taskListProvider.future);
+    expect(filtered.single.id, '2');
   });
 }

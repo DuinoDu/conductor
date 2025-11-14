@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/task.dart';
 import '../../providers.dart';
 
+final currentProjectFilterProvider = StateProvider<String?>((_) => null);
+
 final taskListProvider = AutoDisposeAsyncNotifierProvider<TaskListNotifier, List<Task>>(
   TaskListNotifier.new,
 );
@@ -10,12 +12,14 @@ final taskListProvider = AutoDisposeAsyncNotifierProvider<TaskListNotifier, List
 class TaskListNotifier extends AutoDisposeAsyncNotifier<List<Task>> {
   @override
   Future<List<Task>> build() async {
-    return _load();
+    final projectId = ref.watch(currentProjectFilterProvider);
+    return _load(projectId);
   }
 
   Future<List<Task>> reload() async {
+    final projectId = ref.read(currentProjectFilterProvider);
     state = const AsyncLoading();
-    final tasks = await _load();
+    final tasks = await _load(projectId);
     state = AsyncData(tasks);
     return tasks;
   }
@@ -23,9 +27,12 @@ class TaskListNotifier extends AutoDisposeAsyncNotifier<List<Task>> {
   Future<Task> createTask({required String projectId, required String title}) async {
     final repo = ref.read(taskRepositoryProvider);
     final task = await repo.createTask(projectId: projectId, title: title);
+    final filter = ref.read(currentProjectFilterProvider);
     final current = state.value;
     if (current != null) {
-      state = AsyncData([task, ...current]);
+      if (filter == null || filter == task.projectId) {
+        state = AsyncData([task, ...current]);
+      }
     } else {
       await reload();
     }
@@ -44,8 +51,8 @@ class TaskListNotifier extends AutoDisposeAsyncNotifier<List<Task>> {
     state = AsyncData(updated);
   }
 
-  Future<List<Task>> _load() async {
+  Future<List<Task>> _load(String? projectId) async {
     final repo = ref.read(taskRepositoryProvider);
-    return repo.fetchTasks();
+    return repo.fetchTasks(projectId: projectId);
   }
 }

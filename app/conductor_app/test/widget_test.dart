@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeTaskRepository implements TaskRepository {
   @override
-  Future<List<Task>> fetchTasks() async => const [];
+  Future<List<Task>> fetchTasks({String? projectId, String? status}) async => const [];
 
   @override
   Future<Task> createTask({required String projectId, required String title}) {

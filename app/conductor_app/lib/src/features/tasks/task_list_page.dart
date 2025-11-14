@@ -22,37 +22,44 @@ class TaskListPage extends ConsumerWidget {
         onPressed: () => _showCreateOptions(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: state.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed: $error')),
-        data: (tasks) {
-          if (tasks.isEmpty) {
-            return const Center(child: Text('No tasks yet'));
-          }
-          return RefreshIndicator(
-            onRefresh: () => ref.read(taskListProvider.notifier).reload(),
-            child: ListView.separated(
-              itemCount: tasks.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final task = tasks[index];
-                return ListTile(
-                  title: Text(task.title),
-                  subtitle: Text('Status: ${task.status}'),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            TaskDetailPage(taskId: task.id, title: task.title),
-                      ),
-                    );
-                  },
+      body: Column(
+        children: [
+          const _ProjectFilterBar(),
+          Expanded(
+            child: state.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(child: Text('Failed: $error')),
+              data: (tasks) {
+                if (tasks.isEmpty) {
+                  return const Center(child: Text('No tasks yet'));
+                }
+                return RefreshIndicator(
+                  onRefresh: () => ref.read(taskListProvider.notifier).reload(),
+                  child: ListView.separated(
+                    itemCount: tasks.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final task = tasks[index];
+                      return ListTile(
+                        title: Text(task.title),
+                        subtitle: Text('Status: ${task.status}'),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  TaskDetailPage(taskId: task.id, title: task.title),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -126,6 +133,55 @@ Future<void> _handleCreateTask(BuildContext context, WidgetRef ref) async {
       MaterialPageRoute(
         builder: (_) => TaskDetailPage(taskId: task.id, title: task.title),
       ),
+    );
+  }
+}
+
+class _ProjectFilterBar extends ConsumerWidget {
+  const _ProjectFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projects = ref.watch(projectListProvider);
+    final selected = ref.watch(currentProjectFilterProvider);
+
+    return projects.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (items) {
+        final entries = [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('All Projects'),
+          ),
+          ...items.map(
+            (project) => DropdownMenuItem<String?>(
+              value: project.id,
+              child: Text(project.name),
+            ),
+          ),
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              const Text('Project:'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<String?>(
+                  isExpanded: true,
+                  value: selected,
+                  items: entries,
+                  onChanged: (value) {
+                    ref.read(currentProjectFilterProvider.notifier).state = value;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
