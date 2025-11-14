@@ -2,10 +2,11 @@ class AppConfig {
   const AppConfig({required this.baseUrl, required this.wsUrl});
 
   factory AppConfig.fromEnv() {
-    const apiBase =
-        String.fromEnvironment('API_BASE_URL', defaultValue: 'http://100.72.232.210:4000');
+    const apiBase = String.fromEnvironment('API_BASE_URL',
+        defaultValue: 'http://localhost:4000');
     const wsBase = String.fromEnvironment('WS_URL', defaultValue: '');
-    final resolvedWs = wsBase.isNotEmpty ? wsBase : _deriveWsUrl(apiBase);
+    final resolvedWs =
+        wsBase.isNotEmpty ? _normalizeWsUrl(wsBase) : _deriveWsUrl(apiBase);
     return AppConfig(baseUrl: apiBase, wsUrl: resolvedWs);
   }
 
@@ -13,7 +14,8 @@ class AppConfig {
   final String wsUrl;
 
   static String _deriveWsUrl(String apiBase) {
-    final normalizedBase = apiBase.contains('://') ? apiBase : 'http://$apiBase';
+    final normalizedBase =
+        apiBase.contains('://') ? apiBase : 'http://$apiBase';
     final apiUri = Uri.parse(normalizedBase);
     if (!apiUri.hasAuthority) {
       return 'ws://localhost:4000/ws/app';
@@ -27,5 +29,25 @@ class AppConfig {
           fragment: null,
         )
         .toString();
+  }
+
+  static String _normalizeWsUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'ws://$trimmed';
+    final uri = Uri.parse(candidate);
+    final scheme = uri.scheme;
+    if (scheme == 'http') {
+      return uri.replace(scheme: 'ws').toString();
+    }
+    if (scheme == 'https') {
+      return uri.replace(scheme: 'wss').toString();
+    }
+    if (scheme != 'ws' && scheme != 'wss') {
+      return uri.replace(scheme: 'ws').toString();
+    }
+    return uri.toString();
   }
 }

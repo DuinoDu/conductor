@@ -50,7 +50,7 @@ run: backend-build
 
 run-web:
 	cd $(APP_DIR) && \
-	$(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.232.210:4000
+	$(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.219.59:4000
 
 # >> xcrun simctl list
 SIMULATOR=8887531C-E1FB-4AF9-A96F-FBD41773E39C
@@ -61,7 +61,7 @@ start-simulator:
 
 run-ios:
 	cd $(APP_DIR) && \
-	$(FLUTTER) run --device-id $(SIMULATOR)
+	$(FLUTTER) run --device-id $(SIMULATOR) --dart-define=API_BASE_URL=http://100.72.219.59:4000 --dart-define=WS_URL=ws://100.72.219.59:4000/ws/app
 
 run-android:
 
@@ -87,3 +87,7 @@ kill:
 			echo "No processes listening on port $$port"; \
 		fi; \
 	done;
+
+test-ws-port:
+	npx wscat -c ws://localhost:4000/ws/agent
+	npx wscat -c ws://localhost:4000/ws/app

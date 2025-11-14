@@ -105,16 +105,14 @@ const handleSdkMessage = async (
   });
 };
 
-export const setupAgentGateway = (app: INestApplication): void => {
-  const httpServer = app.getHttpServer();
+export const AGENT_WS_PATH = '/ws/agent';
+
+export const setupAgentGateway = (app: INestApplication): WebSocketServer => {
   const taskService = app.get(TaskService);
   const messageService = app.get(MessageService);
   const realtimeHub = app.get(RealtimeHub);
 
-  const wss = new WebSocketServer({
-    server: httpServer,
-    path: '/ws/agent',
-  });
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (socket, request) => {
     const token = extractToken(request);
@@ -169,7 +167,8 @@ export const setupAgentGateway = (app: INestApplication): void => {
   });
 
   wss.on('error', (err) => logger.error(`Agent WebSocket server error: ${err}`));
-  logger.log('Agent WebSocket gateway ready at /ws/agent');
+  logger.log(`Agent WebSocket gateway ready at ${AGENT_WS_PATH}`);
+  return wss;
 };
 
 const normalizeAgentEnvelope = (

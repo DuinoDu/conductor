@@ -8,13 +8,13 @@ import { RoutePayload } from './types';
 
 const logger = new Logger('AppGateway');
 
-export const setupAppGateway = (app: INestApplication): void => {
-  const httpServer = app.getHttpServer();
+export const APP_WS_PATH = '/ws/app';
+
+export const setupAppGateway = (app: INestApplication): WebSocketServer => {
   const realtimeHub = app.get(RealtimeHub);
 
   const wss = new WebSocketServer({
-    server: httpServer,
-    path: '/ws/app',
+    noServer: true,
   });
 
   wss.on('connection', (socket) => {
@@ -35,7 +35,8 @@ export const setupAppGateway = (app: INestApplication): void => {
   });
 
   wss.on('error', (err) => logger.error(`App WebSocket server error: ${err}`));
-  logger.log('App WebSocket gateway ready at /ws/app');
+  logger.log(`App WebSocket gateway ready at ${APP_WS_PATH}`);
+  return wss;
 };
 
 const sendEnvelope = (socket: WebSocket, payload: unknown) => {
