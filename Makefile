@@ -8,6 +8,7 @@ PYTEST := $(VENV)/bin/pytest
 BACKEND_DIR := backend
 BACKEND_NODE_MODULES := $(BACKEND_DIR)/node_modules
 APP_DIR := app/conductor_app
+FLUTTER ?= $(HOME)/opt/flutter/bin/flutter
 
 .PHONY: deps deps-sdk deps-backend
 deps: deps-sdk deps-backend
@@ -37,7 +38,7 @@ test-backend: deps-backend
 	npm --prefix $(BACKEND_DIR) test
 
 test-app:
-	cd $(APP_DIR); flutter test
+	cd $(APP_DIR); $(FLUTTER) test
 
 test: test-backend test-sdk test-app
 
@@ -49,7 +50,11 @@ run: backend-build
 
 run-web:
 	cd $(APP_DIR) && \
+<<<<<<< Updated upstream
 	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://0.0.0.0:4000
+=======
+	$(FLUTTER) run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.232.210:4000
+>>>>>>> Stashed changes
 
 # >> xcrun simctl list
 SIMULATOR=8887531C-E1FB-4AF9-A96F-FBD41773E39C

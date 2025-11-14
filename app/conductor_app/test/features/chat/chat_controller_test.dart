@@ -18,7 +18,7 @@ class FakeChatRepository implements ChatRepository {
 
   @override
   Future<void> sendMessage(String taskId,
-      {required String content, String role = 'sdk'}) async {
+      {required String content, String role = 'user'}) async {
     sendCount += 1;
     lastContent = content;
     if (shouldFail) {
@@ -54,7 +54,9 @@ void main() {
 
     final messages = container.read(chatProvider('t1')).value!;
     expect(messages.single.content, 'hello');
+    expect(messages.single.role, 'user');
     expect(repo.sendCount, 1);
+    expect(repo.lastContent, 'hello');
   });
 
   test('sendMessage rolls back optimistic entry on error', () async {
@@ -65,11 +67,12 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(chatProvider('t1').future);
-    await expectLater(
-      container.read(chatProvider('t1').notifier).sendMessage('oops'),
+    expect(
+      () => container.read(chatProvider('t1').notifier).sendMessage('oops'),
       throwsException,
     );
     final state = container.read(chatProvider('t1'));
     expect(state.value, isEmpty);
+    expect(repo.sendCount, 1);
   });
 }

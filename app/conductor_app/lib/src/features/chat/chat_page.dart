@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/message.dart';
+import '../tasks/task_list_controller.dart';
 import 'chat_controller.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -27,6 +28,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider(widget.taskId));
     final notifier = ref.read(chatProvider(widget.taskId).notifier);
+    ref.read(unreadTaskProvider.notifier).markRead(widget.taskId);
     return Scaffold(
       appBar: AppBar(title: const Text('Chat')),
       body: Column(

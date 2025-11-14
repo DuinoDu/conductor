@@ -20,7 +20,7 @@ class FakeChatRepository implements ChatRepository {
 
   @override
   Future<void> sendMessage(String taskId,
-      {required String content, String role = 'sdk'}) async {}
+      {required String content, String role = 'user'}) async {}
 }
 
 class FakeTaskRepository implements TaskRepository {
@@ -118,5 +118,35 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     final tasks = notifier.state.value!;
     expect(tasks.single.status, 'RUNNING');
+  });
+
+  test('WsEventListener marks unread for SDK messages', () async {
+    final controller = StreamController<dynamic>();
+    final container = ProviderContainer(overrides: [
+      wsMessageStreamProvider.overrideWith((ref) => controller.stream),
+      chatRepositoryProvider.overrideWithValue(FakeChatRepository()),
+      taskRepositoryProvider.overrideWithValue(
+        FakeTaskRepository(const [
+          Task(id: 'task1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+        ]),
+      ),
+    ]);
+    addTearDown(() => container.dispose());
+
+    container.read(wsEventListenerProvider);
+    await container.read(taskListProvider.notifier).reload();
+
+    controller.add(jsonEncode({
+      'type': 'task_sdk_message',
+      'payload': {
+        'task_id': 'task1',
+        'content': 'hello',
+        'role': 'sdk',
+      }
+    }));
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final unread = container.read(unreadTaskProvider);
+    expect(unread.contains('task1'), isTrue);
   });
 }

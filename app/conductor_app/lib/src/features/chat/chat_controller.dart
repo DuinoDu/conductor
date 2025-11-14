@@ -38,13 +38,13 @@ class ChatController
     final optimisticMessage = Message(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
       taskId: _taskId,
-      role: 'sdk',
+      role: 'user',
       content: trimmed,
       createdAt: DateTime.now(),
     );
     appendLocal(optimisticMessage);
     try {
-      await _repository.sendMessage(_taskId, content: trimmed);
+      await _repository.sendMessage(_taskId, content: trimmed, role: 'user');
     } catch (error) {
       state = AsyncData(previousMessages);
       rethrow;

@@ -56,3 +56,30 @@ class TaskListNotifier extends AutoDisposeAsyncNotifier<List<Task>> {
     return repo.fetchTasks(projectId: projectId);
   }
 }
+
+class UnreadTaskNotifier extends StateNotifier<Set<String>> {
+  UnreadTaskNotifier() : super(<String>{});
+
+  void markUnread(String taskId) {
+    if (taskId.isEmpty) return;
+    if (state.contains(taskId)) {
+      return;
+    }
+    state = {...state, taskId};
+  }
+
+  void markRead(String taskId) {
+    if (!state.contains(taskId)) {
+      return;
+    }
+    final next = {...state};
+    next.remove(taskId);
+    state = next;
+  }
+
+  void clear() => state = <String>{};
+}
+
+final unreadTaskProvider = StateNotifierProvider<UnreadTaskNotifier, Set<String>>(
+  (ref) => UnreadTaskNotifier(),
+);

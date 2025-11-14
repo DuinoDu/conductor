@@ -93,4 +93,12 @@ void main() {
     final filtered = await container.read(taskListProvider.future);
     expect(filtered.single.id, '2');
   });
+
+  test('UnreadTaskNotifier tracks unread ids', () {
+    final notifier = UnreadTaskNotifier();
+    notifier.markUnread('task1');
+    expect(notifier.state.contains('task1'), isTrue);
+    notifier.markRead('task1');
+    expect(notifier.state.contains('task1'), isFalse);
+  });
 }

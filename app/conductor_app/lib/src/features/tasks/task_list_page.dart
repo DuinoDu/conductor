@@ -16,6 +16,7 @@ class TaskListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(taskListProvider);
     ref.watch(projectListProvider);
+    final unreadTasks = ref.watch(unreadTaskProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
       floatingActionButton: FloatingActionButton(
@@ -40,10 +41,13 @@ class TaskListPage extends ConsumerWidget {
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
+                      final hasUnread = unreadTasks.contains(task.id);
                       return ListTile(
                         title: Text(task.title),
                         subtitle: Text('Status: ${task.status}'),
+                        trailing: hasUnread ? const _UnreadDot() : null,
                         onTap: () {
+                          ref.read(unreadTaskProvider.notifier).markRead(task.id);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -183,5 +187,14 @@ class _ProjectFilterBar extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+class _UnreadDot extends StatelessWidget {
+  const _UnreadDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Icon(Icons.circle, color: Colors.redAccent, size: 10);
   }
 }

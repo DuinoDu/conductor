@@ -12,7 +12,7 @@ class ChatRepository {
     return data.whereType<Map<String, dynamic>>().map(Message.fromJson).toList(growable: false);
   }
 
-  Future<void> sendMessage(String taskId, {required String content, String role = 'sdk'}) async {
+  Future<void> sendMessage(String taskId, {required String content, String role = 'user'}) async {
     await _client.post('/tasks/$taskId/messages', data: {
       'content': content,
       'role': role,

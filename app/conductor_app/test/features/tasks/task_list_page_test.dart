@@ -1,4 +1,5 @@
 import 'package:conductor_app/src/features/tasks/task_list_page.dart';
+import 'package:conductor_app/src/features/tasks/task_list_controller.dart';
 import 'package:conductor_app/src/features/tasks/task_repository.dart';
 import 'package:conductor_app/src/features/projects/project_repository.dart';
 import 'package:conductor_app/src/models/task.dart';
@@ -55,6 +56,11 @@ void main() {
         ]),
       ),
       wsMessageStreamProvider.overrideWith((ref) => const Stream.empty()),
+      unreadTaskProvider.overrideWith((ref) {
+        final notifier = UnreadTaskNotifier();
+        notifier.markUnread('1');
+        return notifier;
+      }),
     ];
 
     await tester.pumpWidget(
@@ -67,5 +73,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Demo'), findsOneWidget);
     expect(find.textContaining('Status'), findsOneWidget);
+    expect(find.byIcon(Icons.circle), findsOneWidget);
   });
 }

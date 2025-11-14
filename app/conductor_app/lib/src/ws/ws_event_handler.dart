@@ -54,15 +54,19 @@ class WsEventListener {
     if (body is! Map<String, dynamic>) return;
     final taskId = body['task_id'] as String?;
     if (taskId == null) return;
+    final role = body['role'] as String? ?? 'user';
     final message = Message.fromJson({
       'id': body['id'] ?? DateTime.now().toIso8601String(),
       'task_id': taskId,
-      'role': body['role'] ?? 'user',
+      'role': role,
       'content': body['content'] ?? '',
       'created_at': body['created_at'] ?? DateTime.now().toIso8601String(),
     });
     final notifier = _ref.read(chatProvider(taskId).notifier);
     notifier.appendLocal(message);
+    if (role != 'user') {
+      _ref.read(unreadTaskProvider.notifier).markUnread(taskId);
+    }
   }
 
   void _handleLogEvent(Map<String, dynamic> event) {
