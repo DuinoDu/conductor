@@ -6,6 +6,7 @@ import 'package:conductor_app/src/models/task.dart';
 import 'package:conductor_app/src/models/project.dart';
 import 'package:conductor_app/src/providers.dart';
 import 'package:conductor_app/src/ws/message_stream_provider.dart';
+import 'package:conductor_app/src/ws/ws_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,7 +24,8 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
-  Future<Task> createTask({required String projectId, required String title}) async {
+  Future<Task> createTask(
+      {required String projectId, required String title}) async {
     throw UnimplementedError();
   }
 }
@@ -47,7 +49,13 @@ void main() {
     final overrides = [
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: '1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(
+            id: '1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
         ]),
       ),
       projectRepositoryProvider.overrideWithValue(
@@ -56,6 +64,9 @@ void main() {
         ]),
       ),
       wsMessageStreamProvider.overrideWith((ref) => const Stream.empty()),
+      wsConnectionStatusProvider.overrideWith(
+        (ref) => Stream.value(WebSocketConnectionState.connected),
+      ),
       unreadTaskProvider.overrideWith((ref) {
         final notifier = UnreadTaskNotifier();
         notifier.markUnread('1');
@@ -73,6 +84,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Demo'), findsOneWidget);
     expect(find.textContaining('Status'), findsOneWidget);
+    expect(find.textContaining('Created'), findsOneWidget);
+    expect(find.text('Backend: Connected'), findsOneWidget);
     expect(find.byIcon(Icons.circle), findsOneWidget);
   });
 }

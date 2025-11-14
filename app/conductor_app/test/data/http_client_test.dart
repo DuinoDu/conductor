@@ -15,7 +15,10 @@ void main() {
       dio = Dio(BaseOptions(baseUrl: 'https://api.local'));
       adapter = DioAdapter(dio: dio);
       client = ApiClient(
-        config: const AppConfig(baseUrl: 'https://api.local'),
+        config: const AppConfig(
+          baseUrl: 'https://api.local',
+          wsUrl: 'wss://api.local/ws/app',
+        ),
         authStorage: InMemoryAuthStorage(initialToken: 'abc'),
         dio: dio,
       );

@@ -18,12 +18,14 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
-  Future<Task> createTask({required String projectId, required String title}) async {
+  Future<Task> createTask(
+      {required String projectId, required String title}) async {
     final task = Task(
       id: '${_tasks.length + 1}',
       projectId: projectId,
       title: title,
       status: 'CREATED',
+      createdAt: DateTime.now(),
     );
     _tasks.add(task);
     return task;
@@ -35,7 +37,13 @@ void main() {
     final container = ProviderContainer(overrides: [
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: '1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(
+            id: '1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
         ]),
       ),
     ]);
@@ -65,7 +73,13 @@ void main() {
     final container = ProviderContainer(overrides: [
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: '1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(
+            id: '1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
         ]),
       ),
     ]);
@@ -81,8 +95,20 @@ void main() {
     final container = ProviderContainer(overrides: [
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: '1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
-          Task(id: '2', projectId: 'p2', title: 'Other', status: 'CREATED'),
+          Task(
+            id: '1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
+          Task(
+            id: '2',
+            projectId: 'p2',
+            title: 'Other',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 2, 9),
+          ),
         ]),
       ),
     ]);

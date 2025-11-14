@@ -5,13 +5,15 @@ import 'package:conductor_app/src/models/task.dart';
 import 'package:conductor_app/src/models/project.dart';
 import 'package:conductor_app/src/providers.dart';
 import 'package:conductor_app/src/ws/message_stream_provider.dart';
+import 'package:conductor_app/src/ws/ws_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeTaskRepository implements TaskRepository {
   @override
-  Future<List<Task>> fetchTasks({String? projectId, String? status}) async => const [];
+  Future<List<Task>> fetchTasks({String? projectId, String? status}) async =>
+      const [];
 
   @override
   Future<Task> createTask({required String projectId, required String title}) {
@@ -39,6 +41,9 @@ void main() {
           taskRepositoryProvider.overrideWithValue(FakeTaskRepository()),
           projectRepositoryProvider.overrideWithValue(FakeProjectRepository()),
           wsMessageStreamProvider.overrideWith((ref) => const Stream.empty()),
+          wsConnectionStatusProvider.overrideWith(
+            (ref) => Stream.value(WebSocketConnectionState.connected),
+          ),
         ],
         child: const MaterialApp(home: TaskListPage()),
       ),

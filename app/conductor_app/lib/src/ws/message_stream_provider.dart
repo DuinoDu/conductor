@@ -26,7 +26,6 @@ final wsMessageStreamProvider = StreamProvider.autoDispose((ref) {
   ref.onDispose(() async {
     await sub.cancel();
     await controller.close();
-    await client.dispose();
   });
 
   return controller.stream;
@@ -48,3 +47,12 @@ Uri _resolveWsUri(String baseUrl, String? explicitWsUrl) {
     fragment: null,
   );
 }
+
+final wsConnectionStatusProvider =
+    StreamProvider.autoDispose<WebSocketConnectionState>((ref) {
+  final client = ref.watch(wsClientProvider);
+  scheduleMicrotask(() async {
+    await client.connect();
+  });
+  return client.statusStream;
+});
