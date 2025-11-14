@@ -2,7 +2,7 @@ import '../../data/http_client.dart';
 import '../../models/task.dart';
 
 abstract class TaskRepository {
-  Future<List<Task>> fetchTasks();
+  Future<List<Task>> fetchTasks({String? projectId, String? status});
   Future<Task> createTask({required String projectId, required String title});
 }
 
@@ -12,8 +12,15 @@ class HttpTaskRepository implements TaskRepository {
   final ApiClient _client;
 
   @override
-  Future<List<Task>> fetchTasks() async {
-    final response = await _client.get<List<dynamic>>('/tasks');
+  Future<List<Task>> fetchTasks({String? projectId, String? status}) async {
+    final query = <String, dynamic>{};
+    if (projectId != null) {
+      query['project_id'] = projectId;
+    }
+    if (status != null) {
+      query['status'] = status;
+    }
+    final response = await _client.get<List<dynamic>>('/tasks', query: query.isEmpty ? null : query);
     final data = response.data ?? const [];
     return data
         .whereType<Map<String, dynamic>>()
