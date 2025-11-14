@@ -11,6 +11,7 @@ backend/coverage
 backend/.env
 backend/dist/
 *.db
+!backend/conductor.db
 *.spec.js
 *.spec.js.map
 .flutter-sdk/
