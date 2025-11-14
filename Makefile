@@ -1,3 +1,5 @@
+.PHONY: sdk-test sdk-integration-test backend-test test run backend-build backend-start infra-up infra-down
+
 PYTHON ?= python3
 VENV ?= .venv
 STAMP := $(VENV)/.installed
@@ -13,7 +15,7 @@ deps: deps-sdk deps-backend
 deps-sdk: $(STAMP)
 
 $(STAMP): sdk/requirements-dev.txt
-	if [ ! "$(VENV)" ]; then \
+	if [ ! -d "$(VENV)" ]; then \
 		$(PYTHON) -m venv $(VENV); \
 	fi
 	$(PIP) install --upgrade pip
@@ -24,8 +26,6 @@ deps-backend: $(BACKEND_NODE_MODULES)
 
 $(BACKEND_NODE_MODULES): $(BACKEND_DIR)/package.json $(BACKEND_DIR)/package-lock.json
 	npm --prefix $(BACKEND_DIR) install
-
-.PHONY: sdk-test sdk-integration-test backend-test test run backend-build backend-start infra-up infra-down
 
 test-sdk: deps-sdk
 	PYTHONPATH=$(PWD)/sdk $(PYTEST) sdk/tests
@@ -44,14 +44,25 @@ test: test-backend test-sdk test-app
 backend-build: deps-backend
 	npm --prefix $(BACKEND_DIR) run build
 
-start-backend: backend-build
+run: backend-build
 	cd $(BACKEND_DIR) && PORT=4000 HOST=0.0.0.0 npm start
 
-start-app:
+run-web:
 	cd $(APP_DIR) && \
-	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://100.72.232.210:4000
+	flutter run -d chrome --web-hostname=0.0.0.0 --web-port=6150 --dart-define=API_BASE_URL=http://0.0.0.0:4000
 
-run: start-backend
+# >> xcrun simctl list
+SIMULATOR=8887531C-E1FB-4AF9-A96F-FBD41773E39C
+IPHONE11=00008030-001C48211E28802E
+
+start-simulator:
+	xcrun simctl boot $(SIMULATOR)
+
+run-ios:
+	cd $(APP_DIR) && \
+	flutter run --device-id $(SIMULATOR)
+
+run-android:
 
 infra-up:
 	docker compose -f docker-compose.local.yml up -d
