@@ -100,7 +100,13 @@ void main() {
       chatRepositoryProvider.overrideWithValue(FakeChatRepository()),
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: 'task1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(
+            id: 'task1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
         ]),
       ),
     ]);
@@ -127,7 +133,13 @@ void main() {
       chatRepositoryProvider.overrideWithValue(FakeChatRepository()),
       taskRepositoryProvider.overrideWithValue(
         FakeTaskRepository(const [
-          Task(id: 'task1', projectId: 'p1', title: 'Demo', status: 'CREATED'),
+          Task(
+            id: 'task1',
+            projectId: 'p1',
+            title: 'Demo',
+            status: 'CREATED',
+            createdAt: DateTime(2024, 1, 1, 12),
+          ),
         ]),
       ),
     ]);

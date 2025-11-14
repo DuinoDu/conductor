@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../models/project.dart';
 import '../../models/task.dart';
+import '../../ws/message_stream_provider.dart';
+import '../../ws/ws_client.dart';
 import '../projects/create_project_dialog.dart';
 import '../projects/project_list_controller.dart';
 import 'create_task_dialog.dart';
@@ -25,6 +29,7 @@ class TaskListPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          const _ConnectionStatusBanner(),
           const _ProjectFilterBar(),
           Expanded(
             child: state.when(
@@ -42,17 +47,31 @@ class TaskListPage extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final task = tasks[index];
                       final hasUnread = unreadTasks.contains(task.id);
+                      final createdLabel =
+                          DateFormat.yMMMd().add_Hm().format(task.createdAt);
                       return ListTile(
                         title: Text(task.title),
-                        subtitle: Text('Status: ${task.status}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Status: ${task.status}'),
+                            Text(
+                              'Created $createdLabel',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
                         trailing: hasUnread ? const _UnreadDot() : null,
                         onTap: () {
-                          ref.read(unreadTaskProvider.notifier).markRead(task.id);
+                          ref
+                              .read(unreadTaskProvider.notifier)
+                              .markRead(task.id);
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  TaskDetailPage(taskId: task.id, title: task.title),
+                              builder: (_) => TaskDetailPage(
+                                  taskId: task.id, title: task.title),
                             ),
                           );
                         },
@@ -178,7 +197,8 @@ class _ProjectFilterBar extends ConsumerWidget {
                   value: selected,
                   items: entries,
                   onChanged: (value) {
-                    ref.read(currentProjectFilterProvider.notifier).state = value;
+                    ref.read(currentProjectFilterProvider.notifier).state =
+                        value;
                   },
                 ),
               ),
@@ -196,5 +216,53 @@ class _UnreadDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Icon(Icons.circle, color: Colors.redAccent, size: 10);
+  }
+}
+
+class _ConnectionStatusBanner extends ConsumerWidget {
+  const _ConnectionStatusBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(wsConnectionStatusProvider);
+    return status.when(
+      data: (state) => _StatusRow(state: state),
+      loading: () =>
+          const _StatusRow(state: WebSocketConnectionState.connecting),
+      error: (_, __) =>
+          const _StatusRow(state: WebSocketConnectionState.disconnected),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({required this.state});
+
+  final WebSocketConnectionState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label) = _mapState(state);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Icon(Icons.circle, color: color, size: 14),
+          const SizedBox(width: 8),
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+
+  (Color, String) _mapState(WebSocketConnectionState state) {
+    switch (state) {
+      case WebSocketConnectionState.connected:
+        return (Colors.green, 'Backend: Connected');
+      case WebSocketConnectionState.connecting:
+        return (Colors.orange, 'Backend: Connecting...');
+      case WebSocketConnectionState.disconnected:
+        return (Colors.red, 'Backend: Offline');
+    }
   }
 }
